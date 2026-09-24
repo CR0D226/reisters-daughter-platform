@@ -1,0 +1,6 @@
+@ReistersDaughter.Api_HostAddress = http://localhost:5128
+
+GET {{ReistersDaughter.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
