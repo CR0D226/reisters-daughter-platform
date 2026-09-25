@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using ReistersDaughter.Api.Data;
@@ -12,9 +13,11 @@ using ReistersDaughter.Api.Data;
 namespace ReistersDaughter.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260925000753_AddCustomers")]
+    partial class AddCustomers
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -147,60 +150,6 @@ namespace ReistersDaughter.Api.Migrations
                     b.ToTable("Inquiries");
                 });
 
-            modelBuilder.Entity("ReistersDaughter.Api.Models.InquiryActivity", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("InquiryId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("InquiryId");
-
-                    b.ToTable("InquiryActivities");
-                });
-
-            modelBuilder.Entity("ReistersDaughter.Api.Models.InquiryNote", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Body")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("InquiryId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("InquiryId");
-
-                    b.ToTable("InquiryNotes");
-                });
-
             modelBuilder.Entity("ReistersDaughter.Api.Models.Inquiry", b =>
                 {
                     b.HasOne("ReistersDaughter.Api.Models.Customer", "Customer")
@@ -210,38 +159,9 @@ namespace ReistersDaughter.Api.Migrations
                     b.Navigation("Customer");
                 });
 
-            modelBuilder.Entity("ReistersDaughter.Api.Models.InquiryActivity", b =>
-                {
-                    b.HasOne("ReistersDaughter.Api.Models.Inquiry", "Inquiry")
-                        .WithMany("Activities")
-                        .HasForeignKey("InquiryId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Inquiry");
-                });
-
-            modelBuilder.Entity("ReistersDaughter.Api.Models.InquiryNote", b =>
-                {
-                    b.HasOne("ReistersDaughter.Api.Models.Inquiry", "Inquiry")
-                        .WithMany("Notes")
-                        .HasForeignKey("InquiryId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Inquiry");
-                });
-
             modelBuilder.Entity("ReistersDaughter.Api.Models.Customer", b =>
                 {
                     b.Navigation("Inquiries");
-                });
-
-            modelBuilder.Entity("ReistersDaughter.Api.Models.Inquiry", b =>
-                {
-                    b.Navigation("Activities");
-
-                    b.Navigation("Notes");
                 });
 #pragma warning restore 612, 618
         }
