@@ -11,6 +11,8 @@ public class Quote
 
     public string Status { get; set; } = "Draft";
 
+    public string? PublicToken { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
         = DateTimeOffset.UtcNow;
 
@@ -26,4 +28,5 @@ public class Quote
     public decimal Total { get; set; }
 
     public List<QuoteItem> Items { get; set; } = [];
+    
 }

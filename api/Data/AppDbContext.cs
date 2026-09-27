@@ -31,6 +31,9 @@ public class AppDbContext : DbContext
 
             entity.Property(q => q.Total)
                 .HasPrecision(12, 2);
+            entity
+        .HasIndex(q => q.PublicToken)
+                        .IsUnique();
         });
 
         modelBuilder.Entity<QuoteItem>(entity =>

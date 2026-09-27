@@ -818,7 +818,12 @@ app.MapPut(
         });
     }
 );
+
+
+// =========================================================
 // QUOTES - SEND
+// =========================================================
+
 app.MapPost(
     "/api/quotes/{id:int}/send",
     async (
@@ -837,26 +842,45 @@ app.MapPost(
             });
         }
 
-        if (quote.Status != "Draft")
+        if (
+            quote.Status != "Draft" &&
+            quote.Status != "Sent"
+        )
         {
             return Results.BadRequest(new
             {
-                Message = "Only draft quotes can be sent."
+                Message =
+                    "Only draft or sent quotes can generate a public link."
             });
         }
 
-        quote.Status = "Sent";
-        quote.UpdatedAt = DateTimeOffset.UtcNow;
+        // Generate the secure public token only once.
+        if (string.IsNullOrWhiteSpace(quote.PublicToken))
+        {
+            quote.PublicToken =
+                Convert.ToHexString(
+                    System.Security.Cryptography.RandomNumberGenerator
+                        .GetBytes(32)
+                ).ToLowerInvariant();
+        }
 
-        db.InquiryActivities.Add(
-            new InquiryActivity
-            {
-                InquiryId = quote.InquiryId,
-                Type = "QuoteSent",
-                Description =
-                    $"Quote {quote.QuoteNumber} sent to customer."
-            }
-        );
+        // Only record the send activity the first time.
+        if (quote.Status == "Draft")
+        {
+            quote.Status = "Sent";
+
+            db.InquiryActivities.Add(
+                new InquiryActivity
+                {
+                    InquiryId = quote.InquiryId,
+                    Type = "QuoteSent",
+                    Description =
+                        $"Quote {quote.QuoteNumber} sent to customer."
+                }
+            );
+        }
+
+        quote.UpdatedAt = DateTimeOffset.UtcNow;
 
         await db.SaveChangesAsync();
 
@@ -866,6 +890,7 @@ app.MapPost(
             quote.InquiryId,
             quote.QuoteNumber,
             quote.Status,
+            quote.PublicToken,
             quote.UpdatedAt,
             Message = "Quote sent."
         });
@@ -915,8 +940,147 @@ app.MapGet(
         return Results.Ok(quotes);
     }
 );
+// PUBLIC QUOTES - GET BY TOKEN
+app.MapGet(
+    "/api/public/quotes/{token}",
+    async (
+        string token,
+        AppDbContext db
+    ) =>
+    {
+        var quote = await db.Quotes
+            .AsNoTracking()
+            .Where(quote =>
+                quote.PublicToken == token &&
+                quote.Status != "Draft"
+            )
+            .Select(quote => new
+            {
+                quote.QuoteNumber,
+                quote.Status,
+                quote.CreatedAt,
+                quote.ExpiresAt,
+                quote.CustomerMessage,
+                quote.Subtotal,
+                quote.Tax,
+                quote.Total,
 
+                Customer = new
+                {
+                    quote.Inquiry.FirstName,
+                    quote.Inquiry.LastName,
+                    quote.Inquiry.Company
+                },
 
+                Event = new
+                {
+                    quote.Inquiry.EventType,
+                    quote.Inquiry.EventDate,
+                    quote.Inquiry.EventTime,
+                    quote.Inquiry.GuestCount
+                },
+
+                Items = quote.Items
+                    .OrderBy(item => item.SortOrder)
+                    .Select(item => new
+                    {
+                        item.Description,
+                        item.Quantity,
+                        item.UnitPrice,
+
+                        LineTotal =
+                            item.Quantity *
+                            item.UnitPrice
+                    })
+                    .ToList()
+            })
+            .FirstOrDefaultAsync();
+
+        return quote is null
+            ? Results.NotFound(new
+            {
+                Message = "Quote not found."
+            })
+            : Results.Ok(quote);
+    }
+);
+// =========================================================
+// PUBLIC QUOTES - ACCEPT
+// =========================================================
+
+app.MapPost(
+    "/api/public/quotes/{token}/accept",
+    async (
+        string token,
+        AppDbContext db
+    ) =>
+    {
+        var quote = await db.Quotes
+            .FirstOrDefaultAsync(quote =>
+                quote.PublicToken == token
+            );
+
+        if (quote is null)
+        {
+            return Results.NotFound(new
+            {
+                Message = "Quote not found."
+            });
+        }
+
+        if (quote.Status == "Accepted")
+        {
+            return Results.Ok(new
+            {
+                quote.QuoteNumber,
+                quote.Status,
+                Message = "Quote has already been accepted."
+            });
+        }
+
+        if (quote.Status != "Sent")
+        {
+            return Results.BadRequest(new
+            {
+                Message = "Only sent quotes can be accepted."
+            });
+        }
+
+        if (
+            quote.ExpiresAt.HasValue &&
+            quote.ExpiresAt.Value < DateTimeOffset.UtcNow
+        )
+        {
+            return Results.BadRequest(new
+            {
+                Message = "This quote has expired."
+            });
+        }
+
+        quote.Status = "Accepted";
+        quote.UpdatedAt = DateTimeOffset.UtcNow;
+
+        db.InquiryActivities.Add(
+            new InquiryActivity
+            {
+                InquiryId = quote.InquiryId,
+                Type = "QuoteAccepted",
+                Description =
+                    $"Quote {quote.QuoteNumber} accepted by customer."
+            }
+        );
+
+        await db.SaveChangesAsync();
+
+        return Results.Ok(new
+        {
+            quote.QuoteNumber,
+            quote.Status,
+            quote.UpdatedAt,
+            Message = "Quote accepted successfully."
+        });
+    }
+);
 // =========================================================
 // START APPLICATION
 // =========================================================

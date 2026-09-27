@@ -7,6 +7,7 @@ import CateringView from '@/views/CateringView.vue'
 import AdminInquiriesView from '@/views/AdminInquiriesView.vue'
 import AdminInquiryDetailView from '@/views/AdminInquiryDetailView.vue'
 import AdminQuoteDetailView from '@/views/AdminQuoteDetailView.vue'
+import PublicQuoteView from '@/views/PublicQuoteView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -46,6 +47,11 @@ const router = createRouter({
   path: '/admin/quotes/:id',
   name: 'admin-quote-detail',
   component: AdminQuoteDetailView,
+},
+{
+  path: '/quote/:token',
+  name: 'public-quote',
+  component: PublicQuoteView,
 },
   ],
 })
