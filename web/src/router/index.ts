@@ -6,6 +6,7 @@ import AboutView from '@/views/AboutView.vue'
 import CateringView from '@/views/CateringView.vue'
 import AdminInquiriesView from '@/views/AdminInquiriesView.vue'
 import AdminInquiryDetailView from '@/views/AdminInquiryDetailView.vue'
+import AdminQuoteDetailView from '@/views/AdminQuoteDetailView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -40,6 +41,11 @@ const router = createRouter({
   path: '/admin/inquiries/:id',
   name: 'admin-inquiry-detail',
   component: AdminInquiryDetailView,
+},
+{
+  path: '/admin/quotes/:id',
+  name: 'admin-quote-detail',
+  component: AdminQuoteDetailView,
 },
   ],
 })

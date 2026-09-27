@@ -61,10 +61,25 @@ interface Inquiry {
   notes: InquiryNote[]
   activities: InquiryActivity[]
 }
-
+interface QuoteSummary {
+  id: number
+  quoteNumber: string
+  status: string
+  createdAt: string
+  updatedAt: string
+  expiresAt: string | null
+  subtotal: number
+  tax: number
+  total: number
+  itemCount: number
+}
 const route = useRoute()
 
 const inquiry = ref<Inquiry | null>(null)
+
+const quotes = ref<QuoteSummary[]>([])
+const quotesLoading = ref(false)
+const quotesError = ref('')
 
 const loading = ref(true)
 const errorMessage = ref('')
@@ -154,6 +169,41 @@ function activityLabel(type: string) {
 
     default:
       return 'Activity'
+  }
+}
+
+function formatCurrency(amount: number) {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(amount)
+}
+
+async function loadQuotes() {
+  quotesLoading.value = true
+  quotesError.value = ''
+
+  try {
+    const response = await fetch(
+      `http://localhost:5128/api/inquiries/${route.params.id}/quotes`,
+    )
+
+    if (!response.ok) {
+      throw new Error(
+        `Server returned ${response.status}`,
+      )
+    }
+
+    quotes.value = await response.json()
+  } catch (error) {
+    console.error(error)
+
+    quotesError.value =
+      error instanceof Error
+        ? error.message
+        : 'Could not load quotes.'
+  } finally {
+    quotesLoading.value = false
   }
 }
 
@@ -251,7 +301,12 @@ async function addNote() {
   }
 }
 
-onMounted(loadInquiry)
+onMounted(async () => {
+  await Promise.all([
+    loadInquiry(),
+    loadQuotes(),
+  ])
+})
 </script>
 
 <template>
@@ -510,7 +565,127 @@ onMounted(loadInquiry)
             {{ inquiry.details || 'No message provided.' }}
           </p>
         </section>
+<!-- SAVED QUOTES -->
 
+<section class="panel quotes-panel">
+  <div class="panel-heading">
+    <div>
+      <p class="section-label">
+        Quotes
+      </p>
+
+      <h2>Saved Quotes</h2>
+    </div>
+
+    <span class="count">
+      {{ quotes.length }}
+    </span>
+  </div>
+
+  <p class="helper-text">
+    Quotes created for this inquiry.
+  </p>
+
+  <div
+    v-if="quotesLoading"
+    class="empty-state"
+  >
+    Loading quotes...
+  </div>
+
+  <div
+    v-else-if="quotesError"
+    class="quote-error"
+  >
+    {{ quotesError }}
+  </div>
+
+  <div
+    v-else-if="quotes.length"
+    class="quotes-list"
+  >
+    <article
+      v-for="quote in quotes"
+      :key="quote.id"
+      class="quote-card"
+    >
+      <div class="quote-card-main">
+
+        <div class="quote-card-heading">
+          <div>
+            <h3>
+              {{ quote.quoteNumber }}
+            </h3>
+
+            <p>
+              Created
+              {{ formatCreatedAt(quote.createdAt) }}
+            </p>
+          </div>
+
+          <span
+            class="quote-status"
+            :class="quote.status.toLowerCase()"
+          >
+            {{ quote.status }}
+          </span>
+        </div>
+
+        <div class="quote-meta">
+          <span>
+            {{ quote.itemCount }}
+            {{ quote.itemCount === 1 ? 'item' : 'items' }}
+          </span>
+
+          <span v-if="quote.expiresAt">
+            Expires
+            {{ formatCreatedAt(quote.expiresAt) }}
+          </span>
+        </div>
+
+      </div>
+
+      <div class="quote-totals">
+
+        <div>
+          <span>Subtotal</span>
+          <strong>
+            {{ formatCurrency(quote.subtotal) }}
+          </strong>
+        </div>
+
+        <div>
+          <span>Tax</span>
+          <strong>
+            {{ formatCurrency(quote.tax) }}
+          </strong>
+        </div>
+
+        <div class="quote-total">
+          <span>Total</span>
+          <strong>
+            {{ formatCurrency(quote.total) }}
+          </strong>
+        </div>
+
+      </div>
+
+      <RouterLink
+        class="open-quote-button"
+        :to="`/admin/quotes/${quote.id}`"
+      >
+        Open Quote
+      </RouterLink>
+    </article>
+  </div>
+
+  <div
+    v-else
+    class="empty-state"
+  >
+    No quotes have been created yet.
+  </div>
+</section>
 
         <!-- CRM AREA -->
 
@@ -603,7 +778,12 @@ onMounted(loadInquiry)
           </section>
 <QuoteBuilder
   :inquiry-id="inquiry.id"
-  @saved="loadInquiry"
+  @saved="
+    () => {
+      loadInquiry()
+      loadQuotes()
+    }
+  "
 />
 
           <!-- ACTIVITY -->
@@ -806,7 +986,136 @@ onMounted(loadInquiry)
   white-space: pre-wrap;
 }
 
+/* QUOTES */
 
+.quotes-panel {
+  margin-top: 32px;
+}
+
+.quotes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.quote-card {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 30px;
+  padding: 22px;
+  border: 1px solid #dedad1;
+  border-radius: 12px;
+  background: #faf9f6;
+}
+
+.quote-card-main {
+  min-width: 0;
+}
+
+.quote-card-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+}
+
+.quote-card-heading h3 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.quote-card-heading p {
+  margin: 6px 0 0;
+  color: #817c73;
+  font-size: 0.8rem;
+}
+
+.quote-status {
+  display: inline-flex;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #ece9e2;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.quote-status.draft {
+  background: #ece9e2;
+  color: #625e57;
+}
+
+.quote-status.sent {
+  background: #e8edf4;
+  color: #334e70;
+}
+
+.quote-status.accepted {
+  background: #e5efe7;
+  color: #31593a;
+}
+
+.quote-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 12px;
+  color: #817c73;
+  font-size: 0.8rem;
+}
+
+.quote-totals {
+  min-width: 150px;
+}
+
+.quote-totals div {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 5px;
+  font-size: 0.8rem;
+}
+
+.quote-totals span {
+  color: #817c73;
+}
+
+.quote-total {
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px solid #dedad1;
+}
+
+.quote-total strong {
+  font-size: 1rem;
+}
+
+.open-quote-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  padding: 10px 17px;
+  border-radius: 999px;
+  background: #22221f;
+  color: white;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.open-quote-button:hover {
+  opacity: 0.85;
+}
+
+.quote-error {
+  margin-top: 20px;
+  padding: 16px;
+  border-radius: 10px;
+  background: #f6e9e7;
+  color: #8a3029;
+} 
 /* CRM */
 
 .crm-grid {
@@ -1034,6 +1343,17 @@ onMounted(loadInquiry)
 @media (max-width: 800px) {
   .crm-grid {
     grid-template-columns: 1fr;
+  }
+    .quote-card {
+    grid-template-columns: 1fr;
+  }
+
+  .quote-totals {
+    width: 100%;
+  }
+
+  .open-quote-button {
+    width: 100%;
   }
 }
 

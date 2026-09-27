@@ -453,7 +453,7 @@ app.MapPost(
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow,
 
-            ExpiresAt = request.ExpiresAt,
+            ExpiresAt = request.ExpiresAt?.ToUniversalTime(),
 
             CustomerMessage =
                 string.IsNullOrWhiteSpace(
@@ -635,7 +635,189 @@ app.MapGet(
     }
 );
 
+// QUOTES - UPDATE DRAFT
+app.MapPut(
+    "/api/quotes/{id:int}",
+    async (
+        int id,
+        UpdateQuoteRequest request,
+        AppDbContext db
+    ) =>
+    {
+        var quote = await db.Quotes
+            .Include(quote => quote.Items)
+            .FirstOrDefaultAsync(quote => quote.Id == id);
 
+        if (quote is null)
+        {
+            return Results.NotFound(new
+            {
+                Message = "Quote not found."
+            });
+        }
+
+        if (quote.Status != "Draft")
+        {
+            return Results.BadRequest(new
+            {
+                Message = "Only draft quotes can be edited."
+            });
+        }
+
+        if (request.Items is null || request.Items.Count == 0)
+        {
+            return Results.BadRequest(new
+            {
+                Message = "A quote must contain at least one item."
+            });
+        }
+
+        if (request.Items.Any(item =>
+            string.IsNullOrWhiteSpace(item.Description)))
+        {
+            return Results.BadRequest(new
+            {
+                Message = "Every quote item needs a description."
+            });
+        }
+
+        if (request.Items.Any(item =>
+            item.Quantity <= 0))
+        {
+            return Results.BadRequest(new
+            {
+                Message =
+                    "Item quantities must be greater than zero."
+            });
+        }
+
+        if (request.Items.Any(item =>
+            item.UnitPrice < 0))
+        {
+            return Results.BadRequest(new
+            {
+                Message = "Item prices cannot be negative."
+            });
+        }
+
+        if (request.Tax < 0)
+        {
+            return Results.BadRequest(new
+            {
+                Message = "Tax cannot be negative."
+            });
+        }
+
+        // Replace the existing line items with the
+        // current contents of the editor.
+        db.QuoteItems.RemoveRange(quote.Items);
+        quote.Items.Clear();
+
+        for (
+            var index = 0;
+            index < request.Items.Count;
+            index++
+        )
+        {
+            var requestItem = request.Items[index];
+
+            quote.Items.Add(
+                new QuoteItem
+                {
+                    Description =
+                        requestItem.Description.Trim(),
+                    Quantity = requestItem.Quantity,
+                    UnitPrice = decimal.Round(
+                        requestItem.UnitPrice,
+                        2,
+                        MidpointRounding.AwayFromZero
+                    ),
+                    SortOrder = index
+                }
+            );
+        }
+
+       quote.ExpiresAt =
+    request.ExpiresAt?.ToUniversalTime();
+
+        quote.CustomerMessage =
+            string.IsNullOrWhiteSpace(
+                request.CustomerMessage
+            )
+                ? null
+                : request.CustomerMessage.Trim();
+
+        quote.Tax = decimal.Round(
+            request.Tax,
+            2,
+            MidpointRounding.AwayFromZero
+        );
+
+        quote.Subtotal = decimal.Round(
+            quote.Items.Sum(
+                item =>
+                    item.Quantity * item.UnitPrice
+            ),
+            2,
+            MidpointRounding.AwayFromZero
+        );
+
+        quote.Total = decimal.Round(
+            quote.Subtotal + quote.Tax,
+            2,
+            MidpointRounding.AwayFromZero
+        );
+
+        quote.UpdatedAt = DateTimeOffset.UtcNow;
+
+        db.InquiryActivities.Add(
+            new InquiryActivity
+            {
+                InquiryId = quote.InquiryId,
+                Type = "QuoteUpdated",
+                Description =
+                    $"Quote {quote.QuoteNumber} updated."
+            }
+        );
+
+        await db.SaveChangesAsync();
+
+        return Results.Ok(new
+        {
+            quote.Id,
+            quote.InquiryId,
+            quote.QuoteNumber,
+            quote.Status,
+            quote.CreatedAt,
+            quote.UpdatedAt,
+            quote.ExpiresAt,
+            quote.CustomerMessage,
+            quote.Subtotal,
+            quote.Tax,
+            quote.Total,
+
+            Items = quote.Items
+                .OrderBy(item => item.SortOrder)
+                .Select(item => new
+                {
+                    item.Id,
+                    item.Description,
+                    item.Quantity,
+                    item.UnitPrice,
+
+                    LineTotal = decimal.Round(
+                        item.Quantity *
+                        item.UnitPrice,
+                        2,
+                        MidpointRounding.AwayFromZero
+                    ),
+
+                    item.SortOrder
+                })
+                .ToList()
+        });
+    }
+);
 // =========================================================
 // QUOTES - GET ALL FOR AN INQUIRY
 // =========================================================
@@ -713,4 +895,10 @@ public record CreateQuoteItemRequest(
     string Description,
     int Quantity,
     decimal UnitPrice
+);
+public record UpdateQuoteRequest(
+    DateTimeOffset? ExpiresAt,
+    string? CustomerMessage,
+    decimal Tax,
+    List<CreateQuoteItemRequest> Items
 );
