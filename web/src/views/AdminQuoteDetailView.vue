@@ -31,6 +31,7 @@ const route = useRoute()
 const quote = ref<Quote | null>(null)
 const loading = ref(true)
 const saving = ref(false)
+const sending = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
 
@@ -258,7 +259,60 @@ async function saveQuote() {
     saving.value = false
   }
 }
+async function sendQuote() {
+  if (!quote.value) return
 
+  const confirmed = window.confirm(
+    `Send ${quote.value.quoteNumber} to the customer? Once sent, this quote will be locked from editing.`,
+  )
+
+  if (!confirmed) {
+    return
+  }
+
+  errorMessage.value = ''
+  successMessage.value = ''
+  sending.value = true
+
+  try {
+    const response = await fetch(
+      `http://localhost:5128/api/quotes/${quote.value.id}/send`,
+      {
+        method: 'POST',
+      },
+    )
+
+    if (!response.ok) {
+      let message = 'Could not send quote.'
+
+      try {
+        const data = await response.json()
+
+        if (data.message) {
+          message = data.message
+        }
+      } catch {
+        // Keep default message.
+      }
+
+      throw new Error(message)
+    }
+
+    await loadQuote()
+
+    successMessage.value =
+      'Quote marked as sent successfully.'
+  } catch (error) {
+    console.error(error)
+
+    errorMessage.value =
+      error instanceof Error
+        ? error.message
+        : 'Could not send quote.'
+  } finally {
+    sending.value = false
+  }
+}
 onMounted(loadQuote)
 </script>
 
@@ -487,13 +541,24 @@ onMounted(loadQuote)
             }}
           </button>
 
-          <button
-            type="button"
-            class="send-button"
-            disabled
-          >
-            Send Quote
-          </button>
+         <button
+  type="button"
+  class="send-button"
+  :disabled="
+    sending ||
+    saving ||
+    quote.status !== 'Draft'
+  "
+  @click="sendQuote"
+>
+  {{
+    sending
+      ? 'Sending...'
+      : quote.status === 'Sent'
+        ? 'Quote Sent'
+        : 'Send Quote'
+  }}
+</button>
         </div>
 
       </template>
@@ -770,8 +835,12 @@ textarea:focus {
 }
 
 .send-button {
-  background: #dedad1;
-  color: #817c73;
+  background: #31593a;
+  color: white;
+}
+
+.send-button:hover:not(:disabled) {
+  opacity: 0.85;
 }
 
 .save-button:hover:not(:disabled) {

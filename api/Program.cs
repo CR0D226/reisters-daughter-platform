@@ -818,6 +818,59 @@ app.MapPut(
         });
     }
 );
+// QUOTES - SEND
+app.MapPost(
+    "/api/quotes/{id:int}/send",
+    async (
+        int id,
+        AppDbContext db
+    ) =>
+    {
+        var quote = await db.Quotes
+            .FirstOrDefaultAsync(quote => quote.Id == id);
+
+        if (quote is null)
+        {
+            return Results.NotFound(new
+            {
+                Message = "Quote not found."
+            });
+        }
+
+        if (quote.Status != "Draft")
+        {
+            return Results.BadRequest(new
+            {
+                Message = "Only draft quotes can be sent."
+            });
+        }
+
+        quote.Status = "Sent";
+        quote.UpdatedAt = DateTimeOffset.UtcNow;
+
+        db.InquiryActivities.Add(
+            new InquiryActivity
+            {
+                InquiryId = quote.InquiryId,
+                Type = "QuoteSent",
+                Description =
+                    $"Quote {quote.QuoteNumber} sent to customer."
+            }
+        );
+
+        await db.SaveChangesAsync();
+
+        return Results.Ok(new
+        {
+            quote.Id,
+            quote.InquiryId,
+            quote.QuoteNumber,
+            quote.Status,
+            quote.UpdatedAt,
+            Message = "Quote sent."
+        });
+    }
+);
 // =========================================================
 // QUOTES - GET ALL FOR AN INQUIRY
 // =========================================================
