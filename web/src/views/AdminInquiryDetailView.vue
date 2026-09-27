@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+import QuoteBuilder from '@/components/admin/QuoteBuilder.vue'
 
 interface Customer {
   id: number
@@ -600,7 +601,10 @@ onMounted(loadInquiry)
             </div>
 
           </section>
-
+<QuoteBuilder
+  :inquiry-id="inquiry.id"
+  @saved="loadInquiry"
+/>
 
           <!-- ACTIVITY -->
 

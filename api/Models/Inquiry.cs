@@ -60,4 +60,5 @@ public class Inquiry
     public string Details { get; set; } = string.Empty;
     public List<InquiryNote> Notes { get; set; } = [];
     public List<InquiryActivity> Activities { get; set; } = [];
+    public List<Quote> Quotes { get; set; } = [];
 }
