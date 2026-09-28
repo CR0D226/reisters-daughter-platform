@@ -81,7 +81,7 @@ app.MapPost(
         var customer = await db.Customers
             .FirstOrDefaultAsync(
                 customer =>
-                    customer.Email.ToLower() == normalizedEmail
+                    customer.Email.Trim().ToLower() == normalizedEmail
             );
 
         if (customer is null)
@@ -246,6 +246,113 @@ app.MapGet(
     }
 );
 
+// =========================================================
+// INQUIRIES - LINK CUSTOMER
+// =========================================================
+
+app.MapPost(
+    "/api/inquiries/{id:int}/link-customer",
+    async (
+        int id,
+        AppDbContext db
+    ) =>
+    {
+        var inquiry = await db.Inquiries
+            .Include(inquiry => inquiry.Customer)
+            .FirstOrDefaultAsync(inquiry =>
+                inquiry.Id == id
+            );
+
+        if (inquiry is null)
+        {
+            return Results.NotFound(new
+            {
+                Message = "Inquiry not found."
+            });
+        }
+
+        if (inquiry.CustomerId is not null)
+        {
+            return Results.Ok(new
+            {
+                inquiry.Id,
+                inquiry.CustomerId,
+                Message =
+                    "Inquiry is already linked to a customer."
+            });
+        }
+
+        var normalizedEmail =
+            inquiry.Email.Trim().ToLowerInvariant();
+
+        if (string.IsNullOrWhiteSpace(normalizedEmail))
+        {
+            return Results.BadRequest(new
+            {
+                Message =
+                    "Inquiry does not contain an email address."
+            });
+        }
+
+        var customer = await db.Customers
+            .FirstOrDefaultAsync(customer =>
+                customer.Email.Trim().ToLower() ==
+                normalizedEmail
+            );
+
+        var customerCreated = false;
+
+        if (customer is null)
+        {
+            customer = new Customer
+            {
+                FirstName = inquiry.FirstName.Trim(),
+                LastName = inquiry.LastName.Trim(),
+                Company = inquiry.Company?.Trim(),
+                Email = normalizedEmail,
+                Phone = inquiry.Phone.Trim()
+            };
+
+            db.Customers.Add(customer);
+
+            customerCreated = true;
+        }
+
+        inquiry.Customer = customer;
+
+        db.InquiryActivities.Add(
+            new InquiryActivity
+            {
+                InquiryId = inquiry.Id,
+                Type = "CustomerLinked",
+                Description = customerCreated
+                    ? "Customer record created and linked to inquiry."
+                    : "Inquiry linked to existing customer."
+            }
+        );
+
+        await db.SaveChangesAsync();
+
+        return Results.Ok(new
+        {
+            inquiry.Id,
+            inquiry.CustomerId,
+            Customer = new
+            {
+                customer.Id,
+                customer.FirstName,
+                customer.LastName,
+                customer.Company,
+                customer.Email,
+                customer.Phone
+            },
+            CustomerCreated = customerCreated,
+            Message = customerCreated
+                ? "Customer created and linked."
+                : "Existing customer linked."
+        });
+    }
+);
 
 // =========================================================
 // INQUIRIES - UPDATE STATUS
