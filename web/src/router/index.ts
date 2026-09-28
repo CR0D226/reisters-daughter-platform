@@ -12,6 +12,7 @@ import AdminBookingsView from '@/views/AdminBookingsView.vue'
 import AdminBookingDetailView from '@/views/AdminBookingDetailView.vue'
 import AdminCustomersView from '@/views/AdminCustomersView.vue'
 import AdminCustomerDetailView from '@/views/AdminCustomerDetailView.vue'
+import AdminDashboardView from '@/views/AdminDashboardView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -76,6 +77,11 @@ const router = createRouter({
   path: '/admin/customers/:id',
   name: 'admin-customer-detail',
   component: AdminCustomerDetailView,
+},
+{
+  path: '/admin',
+  name: 'admin-dashboard',
+  component: AdminDashboardView,
 },
   ],
 })

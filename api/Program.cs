@@ -1565,6 +1565,196 @@ app.MapGet(
             : Results.Ok(customer);
     }
 );
+
+// =========================================================
+// ADMIN DASHBOARD
+// =========================================================
+
+app.MapGet(
+    "/api/admin/dashboard",
+    async (AppDbContext db) =>
+    {
+        var now = DateTimeOffset.UtcNow;
+
+        var customerCount = await db.Customers
+            .AsNoTracking()
+            .CountAsync();
+
+        var inquiryCount = await db.Inquiries
+            .AsNoTracking()
+            .CountAsync();
+
+        var newInquiryCount = await db.Inquiries
+            .AsNoTracking()
+            .CountAsync(inquiry =>
+                inquiry.Status == "New"
+            );
+
+        var draftQuoteCount = await db.Quotes
+            .AsNoTracking()
+            .CountAsync(quote =>
+                quote.Status == "Draft"
+            );
+
+        var sentQuoteCount = await db.Quotes
+            .AsNoTracking()
+            .CountAsync(quote =>
+                quote.Status == "Sent"
+            );
+
+        var acceptedQuoteCount = await db.Quotes
+            .AsNoTracking()
+            .CountAsync(quote =>
+                quote.Status == "Accepted"
+            );
+
+        var confirmedBookingCount = await db.Bookings
+            .AsNoTracking()
+            .CountAsync(booking =>
+                booking.Status == "Confirmed"
+            );
+
+        var inPreparationBookingCount = await db.Bookings
+            .AsNoTracking()
+            .CountAsync(booking =>
+                booking.Status == "In Preparation"
+            );
+
+        var recentInquiries = await db.Inquiries
+            .AsNoTracking()
+            .OrderByDescending(inquiry =>
+                inquiry.CreatedAt
+            )
+            .Take(5)
+            .Select(inquiry => new
+            {
+                inquiry.Id,
+                inquiry.CreatedAt,
+                inquiry.Status,
+                inquiry.EventType,
+                inquiry.EventDate,
+                inquiry.EventTime,
+                inquiry.GuestCount,
+
+                Customer = inquiry.Customer == null
+                    ? new
+                    {
+                        Id = (int?)null,
+                        inquiry.FirstName,
+                        inquiry.LastName,
+                        inquiry.Company
+                    }
+                    : new
+                    {
+                        Id = (int?)inquiry.Customer.Id,
+                        inquiry.Customer.FirstName,
+                        inquiry.Customer.LastName,
+                        inquiry.Customer.Company
+                    }
+            })
+            .ToListAsync();
+
+        var upcomingBookings = await db.Bookings
+            .AsNoTracking()
+            .Where(booking =>
+                booking.Status != "Completed" &&
+                booking.Status != "Cancelled"
+            )
+            .OrderBy(booking =>
+                booking.EventDate
+            )
+            .ThenBy(booking =>
+                booking.EventTime
+            )
+            .Take(5)
+            .Select(booking => new
+            {
+                booking.Id,
+                booking.Status,
+                booking.EventType,
+                booking.EventDate,
+                booking.EventTime,
+                booking.GuestCount,
+                booking.Total,
+
+                Customer = booking.Customer == null
+                    ? null
+                    : new
+                    {
+                        booking.Customer.Id,
+                        booking.Customer.FirstName,
+                        booking.Customer.LastName,
+                        booking.Customer.Company
+                    },
+
+                booking.QuoteId,
+                booking.Quote.QuoteNumber,
+                booking.InquiryId
+            })
+            .ToListAsync();
+
+        var quotesNeedingAttention = await db.Quotes
+            .AsNoTracking()
+            .Where(quote =>
+                quote.Status == "Draft" ||
+                quote.Status == "Sent"
+            )
+            .OrderByDescending(quote =>
+                quote.UpdatedAt
+            )
+            .Take(5)
+            .Select(quote => new
+            {
+                quote.Id,
+                quote.QuoteNumber,
+                quote.Status,
+                quote.UpdatedAt,
+                quote.ExpiresAt,
+                quote.Total,
+                quote.InquiryId,
+
+                Customer = new
+                {
+                    quote.Inquiry.CustomerId,
+                    quote.Inquiry.FirstName,
+                    quote.Inquiry.LastName,
+                    quote.Inquiry.Company
+                }
+            })
+            .ToListAsync();
+
+        return Results.Ok(new
+        {
+            GeneratedAt = now,
+
+            Counts = new
+            {
+                Customers = customerCount,
+                Inquiries = inquiryCount,
+                NewInquiries = newInquiryCount,
+
+                Quotes = new
+                {
+                    Draft = draftQuoteCount,
+                    Sent = sentQuoteCount,
+                    Accepted = acceptedQuoteCount
+                },
+
+                Bookings = new
+                {
+                    Confirmed = confirmedBookingCount,
+                    InPreparation =
+                        inPreparationBookingCount
+                }
+            },
+
+            RecentInquiries = recentInquiries,
+            UpcomingBookings = upcomingBookings,
+            QuotesNeedingAttention =
+                quotesNeedingAttention
+        });
+    }
+);
 // =========================================================
 // START APPLICATION
 // =========================================================
