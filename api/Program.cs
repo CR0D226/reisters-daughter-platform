@@ -1433,6 +1433,138 @@ app.MapPatch(
         });
     }
 );
+
+// =========================================================
+// CUSTOMERS - GET ALL
+// =========================================================
+
+app.MapGet(
+    "/api/customers",
+    async (AppDbContext db) =>
+    {
+        var customers = await db.Customers
+            .AsNoTracking()
+            .OrderBy(customer => customer.LastName)
+            .ThenBy(customer => customer.FirstName)
+            .Select(customer => new
+            {
+                customer.Id,
+                customer.CreatedAt,
+                customer.FirstName,
+                customer.LastName,
+                customer.Company,
+                customer.Email,
+                customer.Phone,
+
+                InquiryCount = customer.Inquiries.Count,
+
+                QuoteCount = customer.Inquiries
+                    .SelectMany(inquiry => inquiry.Quotes)
+                    .Count(),
+
+                BookingCount = db.Bookings.Count(
+                    booking =>
+                        booking.CustomerId == customer.Id
+                )
+            })
+            .ToListAsync();
+
+        return Results.Ok(customers);
+    }
+);
+
+
+// =========================================================
+// CUSTOMERS - GET ONE
+// =========================================================
+
+app.MapGet(
+    "/api/customers/{id:int}",
+    async (
+        int id,
+        AppDbContext db
+    ) =>
+    {
+        var customer = await db.Customers
+            .AsNoTracking()
+            .Where(customer => customer.Id == id)
+            .Select(customer => new
+            {
+                customer.Id,
+                customer.CreatedAt,
+                customer.FirstName,
+                customer.LastName,
+                customer.Company,
+                customer.Email,
+                customer.Phone,
+
+                Inquiries = customer.Inquiries
+                    .OrderByDescending(inquiry => inquiry.CreatedAt)
+                    .Select(inquiry => new
+                    {
+                        inquiry.Id,
+                        inquiry.CreatedAt,
+                        inquiry.Status,
+                        inquiry.EventType,
+                        inquiry.EventDate,
+                        inquiry.EventTime,
+                        inquiry.GuestCount,
+                        inquiry.Services,
+                        inquiry.Details,
+
+                        Quotes = inquiry.Quotes
+                            .OrderByDescending(
+                                quote => quote.CreatedAt
+                            )
+                            .Select(quote => new
+                            {
+                                quote.Id,
+                                quote.QuoteNumber,
+                                quote.Status,
+                                quote.CreatedAt,
+                                quote.Total
+                            })
+                            .ToList()
+                    })
+                    .ToList(),
+
+                Bookings = db.Bookings
+                    .Where(booking =>
+                        booking.CustomerId == customer.Id
+                    )
+                    .OrderByDescending(
+                        booking => booking.EventDate
+                    )
+                    .ThenByDescending(
+                        booking => booking.EventTime
+                    )
+                    .Select(booking => new
+                    {
+                        booking.Id,
+                        booking.Status,
+                        booking.EventType,
+                        booking.EventDate,
+                        booking.EventTime,
+                        booking.GuestCount,
+                        booking.Total,
+
+                        booking.QuoteId,
+                        booking.Quote.QuoteNumber,
+
+                        booking.InquiryId
+                    })
+                    .ToList()
+            })
+            .FirstOrDefaultAsync();
+
+        return customer is null
+            ? Results.NotFound(new
+            {
+                Message = "Customer not found."
+            })
+            : Results.Ok(customer);
+    }
+);
 // =========================================================
 // START APPLICATION
 // =========================================================

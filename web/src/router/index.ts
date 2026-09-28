@@ -10,6 +10,8 @@ import AdminQuoteDetailView from '@/views/AdminQuoteDetailView.vue'
 import PublicQuoteView from '@/views/PublicQuoteView.vue'
 import AdminBookingsView from '@/views/AdminBookingsView.vue'
 import AdminBookingDetailView from '@/views/AdminBookingDetailView.vue'
+import AdminCustomersView from '@/views/AdminCustomersView.vue'
+import AdminCustomerDetailView from '@/views/AdminCustomerDetailView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -64,6 +66,16 @@ const router = createRouter({
   path: '/admin/bookings/:id',
   name: 'admin-booking-detail',
   component: AdminBookingDetailView,
+},
+{
+  path: '/admin/customers',
+  name: 'admin-customers',
+  component: AdminCustomersView,
+},
+{
+  path: '/admin/customers/:id',
+  name: 'admin-customer-detail',
+  component: AdminCustomerDetailView,
 },
   ],
 })
