@@ -8,6 +8,8 @@ import AdminInquiriesView from '@/views/AdminInquiriesView.vue'
 import AdminInquiryDetailView from '@/views/AdminInquiryDetailView.vue'
 import AdminQuoteDetailView from '@/views/AdminQuoteDetailView.vue'
 import PublicQuoteView from '@/views/PublicQuoteView.vue'
+import AdminBookingsView from '@/views/AdminBookingsView.vue'
+import AdminBookingDetailView from '@/views/AdminBookingDetailView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -52,6 +54,16 @@ const router = createRouter({
   path: '/quote/:token',
   name: 'public-quote',
   component: PublicQuoteView,
+},
+{
+  path: '/admin/bookings',
+  name: 'admin-bookings',
+  component: AdminBookingsView,
+},
+{
+  path: '/admin/bookings/:id',
+  name: 'admin-booking-detail',
+  component: AdminBookingDetailView,
 },
   ],
 })

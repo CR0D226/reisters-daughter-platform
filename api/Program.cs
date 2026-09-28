@@ -1016,6 +1016,7 @@ app.MapPost(
     ) =>
     {
         var quote = await db.Quotes
+            .Include(quote => quote.Inquiry)
             .FirstOrDefaultAsync(quote =>
                 quote.PublicToken == token
             );
@@ -1028,25 +1029,22 @@ app.MapPost(
             });
         }
 
-        if (quote.Status == "Accepted")
-        {
-            return Results.Ok(new
-            {
-                quote.QuoteNumber,
-                quote.Status,
-                Message = "Quote has already been accepted."
-            });
-        }
-
-        if (quote.Status != "Sent")
+        // Only Sent or already-Accepted quotes are valid here.
+        if (
+            quote.Status != "Sent" &&
+            quote.Status != "Accepted"
+        )
         {
             return Results.BadRequest(new
             {
-                Message = "Only sent quotes can be accepted."
+                Message =
+                    "Only sent quotes can be accepted."
             });
         }
 
+        // Only check expiration when accepting for the first time.
         if (
+            quote.Status == "Sent" &&
             quote.ExpiresAt.HasValue &&
             quote.ExpiresAt.Value < DateTimeOffset.UtcNow
         )
@@ -1057,18 +1055,72 @@ app.MapPost(
             });
         }
 
-        quote.Status = "Accepted";
-        quote.UpdatedAt = DateTimeOffset.UtcNow;
+        var newlyAccepted =
+            quote.Status == "Sent";
 
-        db.InquiryActivities.Add(
-            new InquiryActivity
+        if (newlyAccepted)
+        {
+            quote.Status = "Accepted";
+            quote.UpdatedAt = DateTimeOffset.UtcNow;
+
+            db.InquiryActivities.Add(
+                new InquiryActivity
+                {
+                    InquiryId = quote.InquiryId,
+                    Type = "QuoteAccepted",
+                    Description =
+                        $"Quote {quote.QuoteNumber} accepted by customer."
+                }
+            );
+        }
+
+        // A quote can create only one booking.
+        var booking = await db.Bookings
+            .FirstOrDefaultAsync(booking =>
+                booking.QuoteId == quote.Id
+            );
+
+        var bookingCreated = false;
+
+        if (booking is null)
+        {
+            booking = new Booking
             {
+                QuoteId = quote.Id,
                 InquiryId = quote.InquiryId,
-                Type = "QuoteAccepted",
-                Description =
-                    $"Quote {quote.QuoteNumber} accepted by customer."
-            }
-        );
+                CustomerId = quote.Inquiry.CustomerId,
+
+                Status = "Confirmed",
+
+                EventType =
+                    quote.Inquiry.EventType,
+
+                EventDate =
+                    quote.Inquiry.EventDate,
+
+                EventTime =
+                    quote.Inquiry.EventTime,
+
+                GuestCount =
+                    quote.Inquiry.GuestCount,
+
+                Total = quote.Total
+            };
+
+            db.Bookings.Add(booking);
+
+            db.InquiryActivities.Add(
+                new InquiryActivity
+                {
+                    InquiryId = quote.InquiryId,
+                    Type = "BookingCreated",
+                    Description =
+                        $"Booking created from {quote.QuoteNumber}."
+                }
+            );
+
+            bookingCreated = true;
+        }
 
         await db.SaveChangesAsync();
 
@@ -1077,7 +1129,307 @@ app.MapPost(
             quote.QuoteNumber,
             quote.Status,
             quote.UpdatedAt,
-            Message = "Quote accepted successfully."
+
+            Booking = new
+            {
+                booking.Id,
+                booking.Status,
+                booking.EventType,
+                booking.EventDate,
+                booking.EventTime,
+                booking.GuestCount,
+                booking.Total
+            },
+
+            BookingCreated = bookingCreated,
+
+            Message =
+                newlyAccepted
+                    ? "Quote accepted and booking created successfully."
+                    : bookingCreated
+                        ? "Booking created for accepted quote."
+                        : "Quote has already been accepted and booked."
+        });
+    }
+);
+// =========================================================
+// BOOKINGS - GET ALL
+// =========================================================
+
+app.MapGet(
+    "/api/bookings",
+    async (AppDbContext db) =>
+    {
+        var bookings = await db.Bookings
+            .AsNoTracking()
+            .OrderBy(booking => booking.EventDate)
+            .ThenBy(booking => booking.EventTime)
+            .Select(booking => new
+            {
+                booking.Id,
+                booking.Status,
+                booking.EventType,
+                booking.EventDate,
+                booking.EventTime,
+                booking.GuestCount,
+                booking.Total,
+                booking.CreatedAt,
+                booking.UpdatedAt,
+
+                Quote = new
+                {
+                    booking.QuoteId,
+                    booking.Quote.QuoteNumber
+                },
+
+                Customer = booking.Customer == null
+                    ? null
+                    : new
+                    {
+                        booking.Customer.Id,
+                        booking.Customer.FirstName,
+                        booking.Customer.LastName,
+                        booking.Customer.Company,
+                        booking.Customer.Email,
+                        booking.Customer.Phone
+                    },
+
+                Inquiry = new
+                {
+                    booking.InquiryId,
+                    booking.Inquiry.Services,
+                    booking.Inquiry.CateringType,
+                    booking.Inquiry.ServiceType,
+                    booking.Inquiry.DeliveryAddress,
+                    booking.Inquiry.Packaging,
+                    booking.Inquiry.DietaryNeeds,
+                    booking.Inquiry.OtherDietaryNeeds,
+                    booking.Inquiry.Details
+                }
+            })
+            .ToListAsync();
+
+        return Results.Ok(bookings);
+    }
+);
+// =========================================================
+// BOOKINGS - GET ONE
+// =========================================================
+
+app.MapGet(
+    "/api/bookings/{id:int}",
+    async (
+        int id,
+        AppDbContext db
+    ) =>
+    {
+        var booking = await db.Bookings
+            .AsNoTracking()
+            .Where(booking => booking.Id == id)
+            .Select(booking => new
+            {
+                booking.Id,
+                booking.Status,
+                booking.EventType,
+                booking.EventDate,
+                booking.EventTime,
+                booking.GuestCount,
+                booking.Total,
+                booking.InternalNotes,
+                booking.CreatedAt,
+                booking.UpdatedAt,
+
+                Quote = new
+                {
+                    booking.QuoteId,
+                    booking.Quote.QuoteNumber,
+                    booking.Quote.Status,
+                    booking.Quote.CustomerMessage,
+                    booking.Quote.Subtotal,
+                    booking.Quote.Tax,
+                    booking.Quote.Total,
+
+                    Items = booking.Quote.Items
+                        .OrderBy(item => item.SortOrder)
+                        .Select(item => new
+                        {
+                            item.Id,
+                            item.Description,
+                            item.Quantity,
+                            item.UnitPrice,
+                            LineTotal =
+                                item.Quantity * item.UnitPrice
+                        })
+                        .ToList()
+                },
+
+                Customer = booking.Customer == null
+                    ? null
+                    : new
+                    {
+                        booking.Customer.Id,
+                        booking.Customer.FirstName,
+                        booking.Customer.LastName,
+                        booking.Customer.Company,
+                        booking.Customer.Email,
+                        booking.Customer.Phone
+                    },
+
+                Inquiry = new
+                {
+                    booking.InquiryId,
+                    booking.Inquiry.EventType,
+                    booking.Inquiry.Services,
+                    booking.Inquiry.CateringType,
+                    booking.Inquiry.ServiceType,
+                    booking.Inquiry.DeliveryAddress,
+                    booking.Inquiry.Packaging,
+                    booking.Inquiry.DietaryNeeds,
+                    booking.Inquiry.OtherDietaryNeeds,
+                    booking.Inquiry.Recurring,
+                    booking.Inquiry.Details
+                }
+            })
+            .FirstOrDefaultAsync();
+
+        return booking is null
+            ? Results.NotFound(new
+            {
+                Message = "Booking not found."
+            })
+            : Results.Ok(booking);
+    }
+);
+// =========================================================
+// BOOKINGS - UPDATE STATUS
+// =========================================================
+
+app.MapPatch(
+    "/api/bookings/{id:int}/status",
+    async (
+        int id,
+        UpdateBookingStatusRequest request,
+        AppDbContext db
+    ) =>
+    {
+        var booking = await db.Bookings
+            .FirstOrDefaultAsync(booking =>
+                booking.Id == id
+            );
+
+        if (booking is null)
+        {
+            return Results.NotFound(new
+            {
+                Message = "Booking not found."
+            });
+        }
+
+        var allowedStatuses = new[]
+        {
+            "Confirmed",
+            "In Preparation",
+            "Completed",
+            "Cancelled"
+        };
+
+        if (!allowedStatuses.Contains(request.Status))
+        {
+            return Results.BadRequest(new
+            {
+                Message = "Invalid booking status."
+            });
+        }
+
+        if (booking.Status == request.Status)
+        {
+            return Results.Ok(new
+            {
+                booking.Id,
+                booking.Status,
+                booking.UpdatedAt,
+                Message = "Booking status is already set."
+            });
+        }
+
+        var previousStatus = booking.Status;
+
+        booking.Status = request.Status;
+        booking.UpdatedAt = DateTimeOffset.UtcNow;
+
+        db.InquiryActivities.Add(
+            new InquiryActivity
+            {
+                InquiryId = booking.InquiryId,
+                Type = "BookingStatusChanged",
+                Description =
+                    $"Booking #{booking.Id} changed from {previousStatus} to {booking.Status}."
+            }
+        );
+
+        await db.SaveChangesAsync();
+
+        return Results.Ok(new
+        {
+            booking.Id,
+            booking.Status,
+            booking.UpdatedAt,
+            Message = "Booking status updated."
+        });
+    }
+);
+
+
+// =========================================================
+// BOOKINGS - UPDATE INTERNAL NOTES
+// =========================================================
+
+app.MapPatch(
+    "/api/bookings/{id:int}/notes",
+    async (
+        int id,
+        UpdateBookingNotesRequest request,
+        AppDbContext db
+    ) =>
+    {
+        var booking = await db.Bookings
+            .FirstOrDefaultAsync(booking =>
+                booking.Id == id
+            );
+
+        if (booking is null)
+        {
+            return Results.NotFound(new
+            {
+                Message = "Booking not found."
+            });
+        }
+
+        booking.InternalNotes =
+            string.IsNullOrWhiteSpace(request.InternalNotes)
+                ? null
+                : request.InternalNotes.Trim();
+
+        booking.UpdatedAt = DateTimeOffset.UtcNow;
+
+        db.InquiryActivities.Add(
+            new InquiryActivity
+            {
+                InquiryId = booking.InquiryId,
+                Type = "BookingNotesUpdated",
+                Description =
+                    $"Internal notes updated for Booking #{booking.Id}."
+            }
+        );
+
+        await db.SaveChangesAsync();
+
+        return Results.Ok(new
+        {
+            booking.Id,
+            booking.InternalNotes,
+            booking.UpdatedAt,
+            Message = "Internal notes updated."
         });
     }
 );
@@ -1118,4 +1470,11 @@ public record UpdateQuoteRequest(
     string? CustomerMessage,
     decimal Tax,
     List<CreateQuoteItemRequest> Items
+);
+public record UpdateBookingStatusRequest(
+    string Status
+);
+
+public record UpdateBookingNotesRequest(
+    string? InternalNotes
 );

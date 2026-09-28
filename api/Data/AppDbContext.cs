@@ -16,7 +16,7 @@ public class AppDbContext : DbContext
     public DbSet<InquiryActivity> InquiryActivities => Set<InquiryActivity>();
     public DbSet<Quote> Quotes => Set<Quote>();
     public DbSet<QuoteItem> QuoteItems => Set<QuoteItem>();
-
+    public DbSet<Booking> Bookings => Set<Booking>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -41,5 +41,13 @@ public class AppDbContext : DbContext
             entity.Property(i => i.UnitPrice)
                 .HasPrecision(12, 2);
         });
+        modelBuilder.Entity<Booking>(entity =>
+{
+    entity.Property(booking => booking.Total)
+        .HasPrecision(12, 2);
+
+    entity.HasIndex(booking => booking.QuoteId)
+        .IsUnique();
+});
     }
 }
