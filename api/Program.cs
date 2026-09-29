@@ -1862,6 +1862,172 @@ app.MapGet(
         });
     }
 );
+
+// =========================================================
+// COMMUNICATIONS - CREATE
+// =========================================================
+
+app.MapPost(
+    "/api/communications",
+    async (
+        CreateCommunicationRequest request,
+        AppDbContext db
+    ) =>
+    {
+        var customer = await db.Customers
+            .AsNoTracking()
+            .FirstOrDefaultAsync(customer =>
+                customer.Id == request.CustomerId
+            );
+
+        if (customer is null)
+        {
+            return Results.BadRequest(new
+            {
+                Message = "Customer not found."
+            });
+        }
+
+        if (request.InquiryId.HasValue)
+        {
+            var inquiry = await db.Inquiries
+                .AsNoTracking()
+                .FirstOrDefaultAsync(inquiry =>
+                    inquiry.Id == request.InquiryId.Value &&
+                    inquiry.CustomerId == request.CustomerId
+                );
+
+            if (inquiry is null)
+            {
+                return Results.BadRequest(new
+                {
+                    Message =
+                        "Inquiry does not belong to this customer."
+                });
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Body))
+        {
+            return Results.BadRequest(new
+            {
+                Message = "Message body is required."
+            });
+        }
+
+        var communication = new Communication
+        {
+            CustomerId = request.CustomerId,
+            InquiryId = request.InquiryId,
+            Type = request.Type.Trim(),
+            Direction = request.Direction.Trim(),
+            Subject = request.Subject.Trim(),
+            Body = request.Body.Trim(),
+            FromAddress = request.FromAddress.Trim(),
+            ToAddress = request.ToAddress.Trim(),
+            Status = "Draft"
+        };
+
+        db.Communications.Add(communication);
+
+        await db.SaveChangesAsync();
+
+        return Results.Created(
+            $"/api/communications/{communication.Id}",
+            communication
+        );
+    }
+);
+// =========================================================
+// COMMUNICATIONS - GET ONE
+// =========================================================
+
+app.MapGet(
+    "/api/communications/{id:int}",
+    async (
+        int id,
+        AppDbContext db
+    ) =>
+    {
+        var communication = await db.Communications
+            .AsNoTracking()
+            .Where(communication =>
+                communication.Id == id
+            )
+            .Select(communication => new
+            {
+                communication.Id,
+                communication.CustomerId,
+                communication.InquiryId,
+                communication.Type,
+                communication.Direction,
+                communication.Subject,
+                communication.Body,
+                communication.FromAddress,
+                communication.ToAddress,
+                communication.Status,
+                communication.CreatedAt,
+                communication.SentAt,
+
+                Customer = new
+                {
+                    communication.Customer.Id,
+                    communication.Customer.FirstName,
+                    communication.Customer.LastName,
+                    communication.Customer.Company,
+                    communication.Customer.Email
+                }
+            })
+            .FirstOrDefaultAsync();
+
+        return communication is null
+            ? Results.NotFound(new
+            {
+                Message = "Communication not found."
+            })
+            : Results.Ok(communication);
+    }
+);
+
+// =========================================================
+// COMMUNICATIONS - GET BY CUSTOMER
+// =========================================================
+
+app.MapGet(
+    "/api/customers/{customerId:int}/communications",
+    async (
+        int customerId,
+        AppDbContext db
+    ) =>
+    {
+        var communications = await db.Communications
+            .AsNoTracking()
+            .Where(communication =>
+                communication.CustomerId == customerId
+            )
+            .OrderByDescending(communication =>
+                communication.CreatedAt
+            )
+            .Select(communication => new
+            {
+                communication.Id,
+                communication.InquiryId,
+                communication.Type,
+                communication.Direction,
+                communication.Subject,
+                communication.Body,
+                communication.FromAddress,
+                communication.ToAddress,
+                communication.Status,
+                communication.CreatedAt,
+                communication.SentAt
+            })
+            .ToListAsync();
+
+        return Results.Ok(communications);
+    }
+);
+
 // =========================================================
 // START APPLICATION
 // =========================================================
@@ -1906,4 +2072,14 @@ public record UpdateBookingStatusRequest(
 
 public record UpdateBookingNotesRequest(
     string? InternalNotes
+);
+public record CreateCommunicationRequest(
+    int CustomerId,
+    int? InquiryId,
+    string Type,
+    string Direction,
+    string Subject,
+    string Body,
+    string FromAddress,
+    string ToAddress
 );

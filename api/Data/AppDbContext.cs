@@ -17,6 +17,7 @@ public class AppDbContext : DbContext
     public DbSet<Quote> Quotes => Set<Quote>();
     public DbSet<QuoteItem> QuoteItems => Set<QuoteItem>();
     public DbSet<Booking> Bookings => Set<Booking>();
+    public DbSet<Communication> Communications => Set<Communication>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
