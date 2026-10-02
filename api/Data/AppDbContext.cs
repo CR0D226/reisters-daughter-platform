@@ -19,6 +19,7 @@ public class AppDbContext : DbContext
     public DbSet<Booking> Bookings => Set<Booking>();
     public DbSet<Communication> Communications => Set<Communication>();
     public DbSet<Event> Events => Set<Event>();
+    public DbSet<EventReservation> EventReservations => Set<EventReservation>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -68,6 +69,31 @@ public class AppDbContext : DbContext
                 eventItem.StartDate,
                 eventItem.StartTime,
             });
+        });
+
+        modelBuilder.Entity<EventReservation>(entity =>
+        {
+            entity.HasOne(reservation => reservation.Event)
+                .WithMany()
+                .HasForeignKey(reservation => reservation.EventId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(reservation => reservation.Customer)
+                .WithMany()
+                .HasForeignKey(reservation => reservation.CustomerId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasIndex(reservation => reservation.EventId);
+
+            entity.HasIndex(reservation => reservation.CustomerId);
+
+            entity.HasIndex(reservation => new
+            {
+                reservation.EventId,
+                reservation.Status,
+            });
+
+            entity.HasIndex(reservation => reservation.Email);
         });
     }
 }

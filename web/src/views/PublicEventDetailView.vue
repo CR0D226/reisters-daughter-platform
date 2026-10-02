@@ -2,6 +2,7 @@
 import {
   computed,
   onMounted,
+  reactive,
   ref,
 } from 'vue'
 
@@ -23,12 +24,43 @@ interface PublicEvent {
   capacity: number | null
 }
 
+interface ReservationResponse {
+  id: number
+  eventId: number
+  firstName: string
+  lastName: string
+  email: string
+  phone: string
+  guestCount: number
+  status: string
+  createdAt: string
+}
+
+interface ApiErrorResponse {
+  message?: string
+  availableSeats?: number
+}
+
 const route = useRoute()
 
 const event = ref<PublicEvent | null>(null)
 const loading = ref(true)
 const notFound = ref(false)
 const errorMessage = ref('')
+
+const reservationSubmitting = ref(false)
+const reservationError = ref('')
+const reservationSuccess =
+  ref<ReservationResponse | null>(null)
+
+const reservationForm = reactive({
+  firstName: '',
+  lastName: '',
+  email: '',
+  phone: '',
+  guestCount: 1,
+  notes: '',
+})
 
 const eventId = computed(() => {
   const id = Number(route.params.id)
@@ -78,6 +110,82 @@ async function loadEvent() {
   } finally {
     loading.value = false
   }
+}
+
+async function submitReservation() {
+  if (!eventId.value) {
+    return
+  }
+
+  reservationSubmitting.value = true
+  reservationError.value = ''
+
+  try {
+    const response = await fetch(
+      `http://localhost:5128/api/public/events/${eventId.value}/reservations`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          firstName:
+            reservationForm.firstName,
+          lastName:
+            reservationForm.lastName,
+          email:
+            reservationForm.email,
+          phone:
+            reservationForm.phone,
+          guestCount:
+            reservationForm.guestCount,
+          notes:
+            reservationForm.notes || null,
+        }),
+      },
+    )
+
+    const data =
+      (await response.json()) as
+        | ReservationResponse
+        | ApiErrorResponse
+
+    if (!response.ok) {
+      const apiError =
+        data as ApiErrorResponse
+
+      reservationError.value =
+        apiError.message ??
+        'We could not submit your reservation.'
+
+      return
+    }
+
+    reservationSuccess.value =
+      data as ReservationResponse
+  } catch (error) {
+    console.error(
+      'Unable to submit reservation:',
+      error,
+    )
+
+    reservationError.value =
+      'We could not submit your reservation. Please try again.'
+  } finally {
+    reservationSubmitting.value = false
+  }
+}
+
+function makeAnotherReservation() {
+  reservationSuccess.value = null
+  reservationError.value = ''
+
+  reservationForm.firstName = ''
+  reservationForm.lastName = ''
+  reservationForm.email = ''
+  reservationForm.phone = ''
+  reservationForm.guestCount = 1
+  reservationForm.notes = ''
 }
 
 function parseDate(value: string) {
@@ -167,7 +275,6 @@ onMounted(loadEvent)
       <p>Loading event...</p>
     </section>
 
-
     <section
       v-else-if="notFound"
       class="state-section"
@@ -193,7 +300,6 @@ onMounted(loadEvent)
       </RouterLink>
     </section>
 
-
     <section
       v-else-if="errorMessage"
       class="state-section"
@@ -217,7 +323,6 @@ onMounted(loadEvent)
         Back to Events
       </RouterLink>
     </section>
-
 
     <template v-else-if="event">
 
@@ -250,7 +355,6 @@ onMounted(loadEvent)
 
         </div>
       </section>
-
 
       <!-- EVENT INFORMATION -->
 
@@ -287,7 +391,6 @@ onMounted(loadEvent)
             </p>
           </div>
 
-
           <div class="detail">
             <p class="detail-label">
               Time
@@ -297,7 +400,6 @@ onMounted(loadEvent)
               {{ timeDisplay }}
             </p>
           </div>
-
 
           <div
             v-if="event.location"
@@ -311,7 +413,6 @@ onMounted(loadEvent)
               {{ event.location }}
             </p>
           </div>
-
 
           <div
             v-if="event.capacity"
@@ -327,7 +428,6 @@ onMounted(loadEvent)
           </div>
 
         </div>
-
 
         <div class="event-body">
 
@@ -351,31 +451,192 @@ onMounted(loadEvent)
             </p>
           </div>
 
+          <!-- RESERVATION -->
 
           <aside class="reservation-card">
             <p class="eyebrow">
               Reservations
             </p>
 
-            <h3>
-              Interested in this event?
-            </h3>
+            <template
+              v-if="reservationSuccess"
+            >
+              <h3>
+                Reservation received!
+              </h3>
 
-            <p>
-              Online reservations and
-              ticketing will be available
-              here soon.
-            </p>
+              <p>
+                Thanks,
+                {{ reservationSuccess.firstName }}.
+                Your reservation for
+                {{
+                  reservationSuccess.guestCount
+                }}
+                {{
+                  reservationSuccess.guestCount === 1
+                    ? 'guest'
+                    : 'guests'
+                }}
+                has been received.
+              </p>
 
-            <div class="reservation-status">
-              Reservations coming soon
-            </div>
+              <div class="success-box">
+                <span class="success-label">
+                  Status
+                </span>
+
+                <strong>
+                  {{
+                    reservationSuccess.status
+                  }}
+                </strong>
+              </div>
+
+              <p class="confirmation-note">
+                We'll follow up with you
+                about confirmation and
+                event details.
+              </p>
+
+              <button
+                class="secondary-button"
+                type="button"
+                @click="makeAnotherReservation"
+              >
+                Make Another Reservation
+              </button>
+            </template>
+
+            <template v-else>
+              <h3>
+                Interested in this event?
+              </h3>
+
+              <p>
+                Reserve your spot below.
+                Reservations are pending
+                until confirmed by our team.
+              </p>
+
+              <form
+                class="reservation-form"
+                @submit.prevent="
+                  submitReservation
+                "
+              >
+                <div class="form-row">
+                  <label>
+                    <span>First Name</span>
+
+                    <input
+                      v-model="
+                        reservationForm.firstName
+                      "
+                      type="text"
+                      autocomplete="given-name"
+                      required
+                    />
+                  </label>
+
+                  <label>
+                    <span>Last Name</span>
+
+                    <input
+                      v-model="
+                        reservationForm.lastName
+                      "
+                      type="text"
+                      autocomplete="family-name"
+                      required
+                    />
+                  </label>
+                </div>
+
+                <label>
+                  <span>Email</span>
+
+                  <input
+                    v-model="
+                      reservationForm.email
+                    "
+                    type="email"
+                    autocomplete="email"
+                    required
+                  />
+                </label>
+
+                <label>
+                  <span>Phone</span>
+
+                  <input
+                    v-model="
+                      reservationForm.phone
+                    "
+                    type="tel"
+                    autocomplete="tel"
+                    required
+                  />
+                </label>
+
+                <label>
+                  <span>Number of Guests</span>
+
+                  <input
+                    v-model.number="
+                      reservationForm.guestCount
+                    "
+                    type="number"
+                    min="1"
+                    :max="
+                      event.capacity ?? undefined
+                    "
+                    required
+                  />
+                </label>
+
+                <label>
+                  <span>
+                    Notes
+                    <small>Optional</small>
+                  </span>
+
+                  <textarea
+                    v-model="
+                      reservationForm.notes
+                    "
+                    rows="3"
+                    placeholder="Anything we should know?"
+                  />
+                </label>
+
+                <div
+                  v-if="reservationError"
+                  class="reservation-error"
+                  role="alert"
+                >
+                  {{ reservationError }}
+                </div>
+
+                <button
+                  class="reserve-button"
+                  type="submit"
+                  :disabled="
+                    reservationSubmitting
+                  "
+                >
+                  {{
+                    reservationSubmitting
+                      ? 'Submitting...'
+                      : 'Reserve Your Spot'
+                  }}
+                </button>
+              </form>
+            </template>
           </aside>
 
         </div>
 
       </section>
-
 
       <!-- CATERING CTA -->
 
@@ -522,8 +783,8 @@ onMounted(loadEvent)
 .event-body {
   display: grid;
   grid-template-columns:
-    minmax(0, 1fr) 380px;
-  gap: 80px;
+    minmax(0, 1fr) 420px;
+  gap: 70px;
   align-items: start;
 }
 
@@ -548,6 +809,8 @@ onMounted(loadEvent)
   line-height: 1.8;
 }
 
+/* RESERVATION CARD */
+
 .reservation-card {
   padding: 35px;
   border-radius: 18px;
@@ -565,27 +828,150 @@ onMounted(loadEvent)
   letter-spacing: -0.03em;
 }
 
-.reservation-card > p {
+.reservation-card > p,
+.reservation-card
+  > template
+  > p {
   color: rgba(255, 255, 255, 0.7);
   line-height: 1.6;
 }
 
-.reservation-status {
+.reservation-form {
+  display: grid;
+  gap: 17px;
   margin-top: 28px;
-  padding: 14px 16px;
-  border:
-    1px solid rgba(
-      255,
-      255,
-      255,
-      0.18
-    );
-  border-radius: 10px;
-  color: rgba(255, 255, 255, 0.75);
-  font-size: 0.85rem;
-  font-weight: 700;
-  text-align: center;
 }
+
+.form-row {
+  display: grid;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.reservation-form label {
+  display: grid;
+  gap: 8px;
+}
+
+.reservation-form label > span {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.reservation-form small {
+  margin-left: 5px;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.65rem;
+  font-weight: 500;
+}
+
+.reservation-form input,
+.reservation-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border:
+    1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 9px;
+  outline: none;
+  background:
+    rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  font: inherit;
+}
+
+.reservation-form input {
+  height: 46px;
+  padding: 0 13px;
+}
+
+.reservation-form textarea {
+  min-height: 90px;
+  padding: 12px 13px;
+  resize: vertical;
+}
+
+.reservation-form input:focus,
+.reservation-form textarea:focus {
+  border-color:
+    rgba(255, 255, 255, 0.55);
+}
+
+.reservation-form textarea::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.reserve-button,
+.secondary-button {
+  width: 100%;
+  min-height: 50px;
+  border: 0;
+  border-radius: 9px;
+  cursor: pointer;
+  background: #ffffff;
+  color: #302a25;
+  font: inherit;
+  font-weight: 750;
+}
+
+.reserve-button {
+  margin-top: 4px;
+}
+
+.reserve-button:hover,
+.secondary-button:hover {
+  opacity: 0.9;
+}
+
+.reserve-button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.reservation-error {
+  padding: 12px 14px;
+  border:
+    1px solid rgba(255, 180, 180, 0.35);
+  border-radius: 9px;
+  background:
+    rgba(140, 30, 30, 0.2);
+  color: #ffd7d7;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.success-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 28px 0 18px;
+  padding: 16px;
+  border:
+    1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+}
+
+.success-label {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.confirmation-note {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.9rem;
+}
+
+.secondary-button {
+  margin-top: 12px;
+}
+
+/* PRIVATE EVENTS */
 
 .private-events {
   padding: 100px 5%;
@@ -707,6 +1093,10 @@ onMounted(loadEvent)
 
   .detail:last-child {
     border-bottom: 0;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
   }
 
   .private-events {

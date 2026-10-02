@@ -2419,6 +2419,292 @@ app.MapPut(
         });
     }
 );
+// =========================================================
+// EVENTS - GET RESERVATIONS
+// =========================================================
+
+app.MapGet(
+    "/api/events/{id:int}/reservations",
+    async (
+        int id,
+        AppDbContext db
+    ) =>
+    {
+        var eventItem = await db.Events
+            .AsNoTracking()
+            .Where(eventItem =>
+                eventItem.Id == id
+            )
+            .Select(eventItem => new
+            {
+                eventItem.Id,
+                eventItem.Title,
+                eventItem.Capacity
+            })
+            .FirstOrDefaultAsync();
+
+        if (eventItem is null)
+        {
+            return Results.NotFound(new
+            {
+                Message = "Event not found."
+            });
+        }
+
+        var reservations = await db.EventReservations
+            .AsNoTracking()
+            .Where(reservation =>
+                reservation.EventId == id
+            )
+            .OrderByDescending(reservation =>
+                reservation.CreatedAt
+            )
+            .Select(reservation => new
+            {
+                reservation.Id,
+                reservation.CustomerId,
+                reservation.FirstName,
+                reservation.LastName,
+                reservation.Email,
+                reservation.Phone,
+                reservation.GuestCount,
+                reservation.Status,
+                reservation.Notes,
+                reservation.CreatedAt,
+                reservation.UpdatedAt
+            })
+            .ToListAsync();
+
+        var reservedSeats = reservations
+            .Where(reservation =>
+                reservation.Status == "Pending" ||
+                reservation.Status == "Confirmed"
+            )
+            .Sum(reservation =>
+                reservation.GuestCount
+            );
+
+        var pendingReservations = reservations
+            .Count(reservation =>
+                reservation.Status == "Pending"
+            );
+
+        var confirmedReservations = reservations
+            .Count(reservation =>
+                reservation.Status == "Confirmed"
+            );
+
+        int? remainingSeats = eventItem.Capacity.HasValue
+            ? Math.Max(
+                eventItem.Capacity.Value - reservedSeats,
+                0
+            )
+            : null;
+
+        return Results.Ok(new
+        {
+            EventId = eventItem.Id,
+            eventItem.Title,
+            eventItem.Capacity,
+            ReservedSeats = reservedSeats,
+            RemainingSeats = remainingSeats,
+            ReservationCount = reservations.Count,
+            PendingReservations = pendingReservations,
+            ConfirmedReservations = confirmedReservations,
+            Reservations = reservations
+        });
+    }
+);
+
+// =========================================================
+// EVENTS - UPDATE RESERVATION STATUS
+// =========================================================
+
+// =========================================================
+// EVENTS - UPDATE RESERVATION STATUS
+// =========================================================
+
+app.MapPut(
+    "/api/events/{eventId:int}/reservations/{reservationId:int}/status",
+    async (
+        int eventId,
+        int reservationId,
+        UpdateEventReservationStatusRequest request,
+        AppDbContext db
+    ) =>
+    {
+        var allowedStatuses = new[]
+        {
+            "Pending",
+            "Confirmed",
+            "Cancelled"
+        };
+
+        var requestedStatus =
+            request.Status?.Trim() ?? string.Empty;
+
+        if (!allowedStatuses.Contains(
+                requestedStatus,
+                StringComparer.OrdinalIgnoreCase))
+        {
+            return Results.BadRequest(new
+            {
+                Message =
+                    "Status must be Pending, Confirmed, or Cancelled."
+            });
+        }
+
+        var normalizedStatus =
+            allowedStatuses.First(status =>
+                status.Equals(
+                    requestedStatus,
+                    StringComparison.OrdinalIgnoreCase
+                )
+            );
+
+        var eventItem = await db.Events
+            .FirstOrDefaultAsync(eventItem =>
+                eventItem.Id == eventId
+            );
+
+        if (eventItem is null)
+        {
+            return Results.NotFound(new
+            {
+                Message = "Event not found."
+            });
+        }
+
+        var reservation =
+            await db.EventReservations
+                .FirstOrDefaultAsync(reservation =>
+                    reservation.Id == reservationId &&
+                    reservation.EventId == eventId
+                );
+
+        if (reservation is null)
+        {
+            return Results.NotFound(new
+            {
+                Message = "Reservation not found."
+            });
+        }
+
+        // A cancelled reservation no longer holds seats.
+        // If it is restored, make sure capacity still exists.
+        if (
+            reservation.Status == "Cancelled" &&
+            (
+                normalizedStatus == "Pending" ||
+                normalizedStatus == "Confirmed"
+            ) &&
+            eventItem.Capacity.HasValue
+        )
+        {
+            var reservedSeats =
+                await db.EventReservations
+                    .Where(existing =>
+                        existing.EventId == eventId &&
+                        existing.Id != reservation.Id &&
+                        (
+                            existing.Status == "Pending" ||
+                            existing.Status == "Confirmed"
+                        )
+                    )
+                    .SumAsync(existing =>
+                        existing.GuestCount
+                    );
+
+            var availableSeats =
+                eventItem.Capacity.Value -
+                reservedSeats;
+
+            if (
+                reservation.GuestCount >
+                availableSeats
+            )
+            {
+                return Results.BadRequest(new
+                {
+                    Message =
+                        availableSeats > 0
+                            ? $"This reservation needs {reservation.GuestCount} seats, but only {availableSeats} seat(s) remain."
+                            : "This event is currently full.",
+                    AvailableSeats =
+                        Math.Max(
+                            availableSeats,
+                            0
+                        )
+                });
+            }
+        }
+
+        reservation.Status = normalizedStatus;
+        reservation.UpdatedAt =
+            DateTimeOffset.UtcNow;
+
+        await db.SaveChangesAsync();
+
+        return Results.Ok(new
+        {
+            reservation.Id,
+            reservation.EventId,
+            reservation.Status,
+            reservation.GuestCount,
+            reservation.UpdatedAt
+        });
+    }
+);
+// =========================================================
+// EVENTS - DELETE RESERVATION
+// =========================================================
+
+app.MapDelete(
+    "/api/events/{eventId:int}/reservations/{reservationId:int}",
+    async (
+        int eventId,
+        int reservationId,
+        AppDbContext db
+    ) =>
+    {
+        var reservation =
+            await db.EventReservations
+                .FirstOrDefaultAsync(reservation =>
+                    reservation.Id == reservationId &&
+                    reservation.EventId == eventId
+                );
+
+        if (reservation is null)
+        {
+            return Results.NotFound(new
+            {
+                Message = "Reservation not found."
+            });
+        }
+
+        if (
+            !reservation.Status.Equals(
+                "Cancelled",
+                StringComparison.OrdinalIgnoreCase
+            )
+        )
+        {
+            return Results.BadRequest(new
+            {
+                Message =
+                    "Only cancelled reservations can be permanently deleted."
+            });
+        }
+
+        db.EventReservations.Remove(
+            reservation
+        );
+
+        await db.SaveChangesAsync();
+
+        return Results.NoContent();
+    }
+);
 
 // =========================================================
 // PUBLIC EVENTS
@@ -2505,6 +2791,152 @@ app.MapGet(
         return Results.Ok(eventItem);
     }
 );
+
+// =========================================================
+// PUBLIC EVENT RESERVATIONS
+// Creates a pending reservation for a Public + Published event.
+// Capacity is enforced server-side.
+// =========================================================
+
+app.MapPost(
+    "/api/public/events/{id:int}/reservations",
+    async (
+        int id,
+        CreateEventReservationRequest request,
+        AppDbContext db
+    ) =>
+    {
+        var eventItem = await db.Events
+            .FirstOrDefaultAsync(eventItem =>
+                eventItem.Id == id &&
+                eventItem.IsPublic &&
+                eventItem.Status == "Published"
+            );
+
+        if (eventItem is null)
+        {
+            return Results.NotFound(new
+            {
+                Message = "Event not found."
+            });
+        }
+
+        var firstName = request.FirstName?.Trim() ?? string.Empty;
+        var lastName = request.LastName?.Trim() ?? string.Empty;
+        var email = request.Email?.Trim() ?? string.Empty;
+        var phone = request.Phone?.Trim() ?? string.Empty;
+        var notes = request.Notes?.Trim();
+
+        if (string.IsNullOrWhiteSpace(firstName) ||
+            string.IsNullOrWhiteSpace(lastName))
+        {
+            return Results.BadRequest(new
+            {
+                Message = "First name and last name are required."
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            return Results.BadRequest(new
+            {
+                Message = "Email is required."
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(phone))
+        {
+            return Results.BadRequest(new
+            {
+                Message = "Phone number is required."
+            });
+        }
+
+        if (request.GuestCount < 1)
+        {
+            return Results.BadRequest(new
+            {
+                Message = "Guest count must be at least 1."
+            });
+        }
+
+        var reservedSeats = await db.EventReservations
+            .Where(reservation =>
+                reservation.EventId == id &&
+                (
+                    reservation.Status == "Pending" ||
+                    reservation.Status == "Confirmed"
+                )
+            )
+            .SumAsync(reservation => reservation.GuestCount);
+
+        if (eventItem.Capacity.HasValue)
+        {
+            var availableSeats =
+                eventItem.Capacity.Value - reservedSeats;
+
+            if (request.GuestCount > availableSeats)
+            {
+                return Results.BadRequest(new
+                {
+                    Message = availableSeats > 0
+                        ? $"Only {availableSeats} seat(s) remain."
+                        : "This event is currently full.",
+                    AvailableSeats = Math.Max(availableSeats, 0)
+                });
+            }
+        }
+
+        Customer? customer = null;
+
+        if (!string.IsNullOrWhiteSpace(email))
+        {
+            var normalizedEmail = email.ToLower();
+
+            customer = await db.Customers
+                .FirstOrDefaultAsync(customer =>
+                    customer.Email.ToLower() == normalizedEmail
+                );
+        }
+
+        var reservation = new EventReservation
+        {
+            EventId = eventItem.Id,
+            CustomerId = customer?.Id,
+            FirstName = firstName,
+            LastName = lastName,
+            Email = email,
+            Phone = phone,
+            GuestCount = request.GuestCount,
+            Status = "Pending",
+            Notes = string.IsNullOrWhiteSpace(notes)
+                ? null
+                : notes,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+
+        db.EventReservations.Add(reservation);
+
+        await db.SaveChangesAsync();
+
+        return Results.Created(
+            $"/api/public/events/{id}/reservations/{reservation.Id}",
+            new
+            {
+                reservation.Id,
+                reservation.EventId,
+                reservation.FirstName,
+                reservation.LastName,
+                reservation.Email,
+                reservation.Phone,
+                reservation.GuestCount,
+                reservation.Status,
+                reservation.CreatedAt
+            }
+        );
+    }
+);
 // =========================================================
 // START APPLICATION
 // =========================================================
@@ -2574,5 +3006,16 @@ public record CreateEventRequest(
     int? BookingId
 );
 public record UpdateEventStatusRequest(
+    string Status
+);
+public record CreateEventReservationRequest(
+    string FirstName,
+    string LastName,
+    string Email,
+    string Phone,
+    int GuestCount,
+    string? Notes
+);
+public record UpdateEventReservationStatusRequest(
     string Status
 );

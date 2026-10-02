@@ -20,6 +20,32 @@ interface EventRecord {
   updatedAt: string
 }
 
+interface EventReservation {
+  id: number
+  customerId: number | null
+  firstName: string
+  lastName: string
+  email: string
+  phone: string
+  guestCount: number
+  status: string
+  notes: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+interface ReservationSummary {
+  eventId: number
+  title: string
+  capacity: number | null
+  reservedSeats: number
+  remainingSeats: number | null
+  reservationCount: number
+  pendingReservations: number
+  confirmedReservations: number
+  reservations: EventReservation[]
+}
+
 const route = useRoute()
 const router = useRouter()
 
@@ -27,8 +53,15 @@ const loading = ref(false)
 const saving = ref(false)
 const statusUpdating = ref(false)
 
+const reservationsLoading = ref(false)
+const reservationStatusUpdating =
+  ref<number | null>(null)
+
 const errorMessage = ref('')
 const successMessage = ref('')
+
+const reservationSummary =
+  ref<ReservationSummary | null>(null)
 
 const eventId = computed(() => {
   const id = Number(route.params.id)
@@ -189,6 +222,169 @@ function populateForm(
     eventRecord.capacity
 }
 
+function formatReservationDate(
+  value: string,
+) {
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+
+  return new Intl.DateTimeFormat(
+    'en-US',
+    {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    },
+  ).format(date)
+}
+
+async function loadReservations() {
+  if (!eventId.value || isNew.value) {
+    return
+  }
+
+  reservationsLoading.value = true
+
+  try {
+    const response = await fetch(
+      `http://localhost:5128/api/events/${eventId.value}/reservations`,
+    )
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      throw new Error(
+        data.message ||
+          'Unable to load reservations.',
+      )
+    }
+
+    reservationSummary.value = data
+  } catch (error) {
+    console.error(error)
+
+    errorMessage.value =
+      error instanceof Error
+        ? error.message
+        : 'Unable to load reservations.'
+  } finally {
+    reservationsLoading.value = false
+  }
+}
+
+async function updateReservationStatus(
+  reservationId: number,
+  newStatus: string,
+) {
+  if (!eventId.value) {
+    return
+  }
+
+  clearMessages()
+
+  reservationStatusUpdating.value =
+    reservationId
+
+  try {
+    const response = await fetch(
+      `http://localhost:5128/api/events/${eventId.value}/reservations/${reservationId}/status`,
+      {
+        method: 'PUT',
+
+        headers: {
+          'Content-Type':
+            'application/json',
+        },
+
+        body: JSON.stringify({
+          status: newStatus,
+        }),
+      },
+    )
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      throw new Error(
+        data.message ||
+          'Unable to update reservation.',
+      )
+    }
+
+    successMessage.value =
+      `Reservation moved to ${data.status}.`
+
+    await loadReservations()
+  } catch (error) {
+    console.error(error)
+
+    errorMessage.value =
+      error instanceof Error
+        ? error.message
+        : 'Unable to update reservation.'
+  } finally {
+    reservationStatusUpdating.value = null
+  }
+}
+
+async function deleteReservation(
+  reservationId: number,
+) {
+  if (!eventId.value) {
+    return
+  }
+
+  const confirmed = window.confirm(
+    'Permanently delete this reservation? This cannot be undone.',
+  )
+
+  if (!confirmed) {
+    return
+  }
+
+  clearMessages()
+
+  reservationStatusUpdating.value =
+    reservationId
+
+  try {
+    const response = await fetch(
+      `http://localhost:5128/api/events/${eventId.value}/reservations/${reservationId}`,
+      {
+        method: 'DELETE',
+      },
+    )
+
+    if (!response.ok) {
+      const data = await response.json()
+
+      throw new Error(
+        data.message ||
+          'Unable to delete reservation.',
+      )
+    }
+
+    successMessage.value =
+      'Reservation permanently deleted.'
+
+    await loadReservations()
+  } catch (error) {
+    console.error(error)
+
+    errorMessage.value =
+      error instanceof Error
+        ? error.message
+        : 'Unable to delete reservation.'
+  } finally {
+    reservationStatusUpdating.value = null
+  }
+}
+
 async function loadEvent() {
   if (isNew.value) {
     return
@@ -219,6 +415,8 @@ async function loadEvent() {
       await response.json()
 
     populateForm(eventRecord)
+
+    await loadReservations()
   } catch (error) {
     console.error(error)
 
@@ -281,6 +479,8 @@ async function saveEvent() {
 
     successMessage.value =
       'Event saved.'
+
+    await loadReservations()
   } catch (error) {
     console.error(error)
 
@@ -397,7 +597,7 @@ onMounted(loadEvent)
               {{
                 isNew
                   ? 'Add an event to the internal calendar.'
-                  : 'Manage event details, visibility, and publishing.'
+                  : 'Manage event details, reservations, visibility, and publishing.'
               }}
             </p>
           </div>
@@ -452,9 +652,7 @@ onMounted(loadEvent)
 
                   <select v-model="type">
                     <option
-                      v-for="
-                        option in eventTypes
-                      "
+                      v-for="option in eventTypes"
                       :key="option"
                       :value="option"
                     >
@@ -548,6 +746,302 @@ onMounted(loadEvent)
                   />
                 </label>
               </div>
+            </section>
+
+            <section
+              v-if="!isNew"
+              class="editor-card"
+            >
+              <div class="card-heading reservations-heading">
+                <div>
+                  <p class="card-eyebrow">
+                    Attendance
+                  </p>
+
+                  <h2>
+                    Reservations
+                  </h2>
+                </div>
+
+                <button
+                  type="button"
+                  class="refresh-button"
+                  :disabled="reservationsLoading"
+                  @click="loadReservations"
+                >
+                  {{
+                    reservationsLoading
+                      ? 'Loading...'
+                      : 'Refresh'
+                  }}
+                </button>
+              </div>
+
+              <div
+                v-if="reservationsLoading &&
+                  !reservationSummary"
+                class="reservation-empty"
+              >
+                Loading reservations...
+              </div>
+
+              <template
+                v-else-if="reservationSummary"
+              >
+                <div class="reservation-stats">
+                  <div class="stat-card">
+                    <strong>
+                      {{
+                        reservationSummary.reservedSeats
+                      }}
+                    </strong>
+
+                    <span>
+                      Reserved Seats
+                    </span>
+                  </div>
+
+                  <div class="stat-card">
+                    <strong>
+                      {{
+                        reservationSummary.capacity ??
+                          '—'
+                      }}
+                    </strong>
+
+                    <span>
+                      Capacity
+                    </span>
+                  </div>
+
+                  <div class="stat-card">
+                    <strong>
+                      {{
+                        reservationSummary.remainingSeats ??
+                          '—'
+                      }}
+                    </strong>
+
+                    <span>
+                      Remaining
+                    </span>
+                  </div>
+                </div>
+
+                <div class="reservation-breakdown">
+                  <span>
+                    {{
+                      reservationSummary.reservationCount
+                    }}
+                    {{
+                      reservationSummary.reservationCount === 1
+                        ? 'reservation'
+                        : 'reservations'
+                    }}
+                  </span>
+
+                  <span>
+                    {{
+                      reservationSummary.pendingReservations
+                    }}
+                    pending
+                  </span>
+
+                  <span>
+                    {{
+                      reservationSummary.confirmedReservations
+                    }}
+                    confirmed
+                  </span>
+                </div>
+
+                <div
+                  v-if="
+                    reservationSummary.reservations.length === 0
+                  "
+                  class="reservation-empty"
+                >
+                  No reservations have been submitted
+                  for this event yet.
+                </div>
+
+                <div
+                  v-else
+                  class="reservation-list"
+                >
+                  <article
+                    v-for="
+                      reservation in
+                        reservationSummary.reservations
+                    "
+                    :key="reservation.id"
+                    class="reservation-card"
+                  >
+                    <div class="reservation-top">
+                      <div>
+                        <h3>
+                          {{ reservation.firstName }}
+                          {{ reservation.lastName }}
+                        </h3>
+
+                        <p class="reservation-submitted">
+                          Submitted
+                          {{
+                            formatReservationDate(
+                              reservation.createdAt,
+                            )
+                          }}
+                        </p>
+                      </div>
+
+                      <span
+                        class="status-badge"
+                        :class="
+                          statusClass(
+                            reservation.status,
+                          )
+                        "
+                      >
+                        {{ reservation.status }}
+                      </span>
+                    </div>
+
+                    <div class="reservation-details">
+                      <div>
+                        <span>Guests</span>
+                        <strong>
+                          {{ reservation.guestCount }}
+                        </strong>
+                      </div>
+
+                      <div>
+                        <span>Email</span>
+
+                        <a
+                          :href="
+                            `mailto:${reservation.email}`
+                          "
+                        >
+                          {{ reservation.email }}
+                        </a>
+                      </div>
+
+                      <div>
+                        <span>Phone</span>
+
+                        <a
+                          :href="
+                            `tel:${reservation.phone}`
+                          "
+                        >
+                          {{ reservation.phone }}
+                        </a>
+                      </div>
+                    </div>
+
+                    <div
+                      v-if="reservation.notes"
+                      class="reservation-notes"
+                    >
+                      <span>Notes</span>
+
+                      <p>
+                        {{ reservation.notes }}
+                      </p>
+                    </div>
+
+                    <div class="reservation-actions">
+                      <button
+                        v-if="
+                          reservation.status !==
+                            'Confirmed'
+                        "
+                        type="button"
+                        class="confirm-button"
+                        :disabled="
+                          reservationStatusUpdating ===
+                            reservation.id
+                        "
+                        @click="
+                          updateReservationStatus(
+                            reservation.id,
+                            'Confirmed',
+                          )
+                        "
+                      >
+                        {{
+                          reservationStatusUpdating ===
+                            reservation.id
+                            ? 'Updating...'
+                            : 'Confirm'
+                        }}
+                      </button>
+
+                      <button
+                        v-if="
+                          reservation.status !==
+                            'Pending'
+                        "
+                        type="button"
+                        class="secondary-small-button"
+                        :disabled="
+                          reservationStatusUpdating ===
+                            reservation.id
+                        "
+                        @click="
+                          updateReservationStatus(
+                            reservation.id,
+                            'Pending',
+                          )
+                        "
+                      >
+                        Move to Pending
+                      </button>
+
+                      <button
+                        v-if="
+                          reservation.status !==
+                            'Cancelled'
+                        "
+                        type="button"
+                        class="cancel-small-button"
+                        :disabled="
+                          reservationStatusUpdating ===
+                            reservation.id
+                        "
+                        @click="
+                          updateReservationStatus(
+                            reservation.id,
+                            'Cancelled',
+                          )
+                        "
+                      >
+                      
+                        Cancel
+                      </button>
+                      <button
+  v-if="
+    reservation.status ===
+      'Cancelled'
+  "
+  type="button"
+  class="delete-small-button"
+  :disabled="
+    reservationStatusUpdating ===
+      reservation.id
+  "
+  @click="
+    deleteReservation(
+      reservation.id,
+    )
+  "
+>
+  Delete Permanently
+</button>
+                    </div>
+                  </article>
+                </div>
+              </template>
             </section>
           </div>
 
@@ -978,14 +1472,16 @@ onMounted(loadEvent)
   font-weight: 700;
 }
 
-.status-published {
+.status-published,
+.status-confirmed {
   background: #e3eee5;
   color: #3d6344;
 }
 
-.status-draft {
-  background: #ece8e3;
-  color: #655c54;
+.status-draft,
+.status-pending {
+  background: #f3ead7;
+  color: #775e2f;
 }
 
 .status-completed {
@@ -1025,6 +1521,214 @@ onMounted(loadEvent)
   color: #655d56;
 }
 
+/* Reservations */
+
+.reservations-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.refresh-button {
+  border: 1px solid #d6cec6;
+  border-radius: 0.55rem;
+  background: #ffffff;
+  padding: 0.5rem 0.75rem;
+  color: #514840;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.refresh-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.reservation-stats {
+  display: grid;
+  grid-template-columns:
+    repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 0.9rem;
+}
+
+.stat-card {
+  display: grid;
+  gap: 0.2rem;
+  border-radius: 0.75rem;
+  background: #f7f5f1;
+  padding: 1rem;
+}
+
+.stat-card strong {
+  color: #302a25;
+  font-size: 1.5rem;
+}
+
+.stat-card span {
+  color: #746a62;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.reservation-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  border-bottom: 1px solid #eee8e2;
+  padding-bottom: 1rem;
+  color: #746a62;
+  font-size: 0.8rem;
+}
+
+.reservation-list {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.reservation-card {
+  border: 1px solid #e3ddd7;
+  border-radius: 0.8rem;
+  padding: 1rem;
+}
+
+.reservation-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.reservation-top h3 {
+  margin: 0;
+  color: #302a25;
+  font-size: 1rem;
+}
+
+.reservation-submitted {
+  margin: 0.25rem 0 0;
+  color: #8a817a;
+  font-size: 0.75rem;
+}
+
+.reservation-details {
+  display: grid;
+  grid-template-columns:
+    0.5fr 1.5fr 1fr;
+  gap: 1rem;
+}
+
+.reservation-details > div {
+  display: grid;
+  align-content: start;
+  gap: 0.25rem;
+}
+
+.reservation-details span,
+.reservation-notes > span {
+  color: #8a817a;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.reservation-details strong {
+  color: #302a25;
+}
+
+.reservation-details a {
+  color: #5e5147;
+  overflow-wrap: anywhere;
+}
+
+.reservation-notes {
+  margin-top: 1rem;
+  border-radius: 0.6rem;
+  background: #f7f5f1;
+  padding: 0.8rem;
+}
+
+.reservation-notes p {
+  margin: 0.3rem 0 0;
+  color: #5f5650;
+  line-height: 1.5;
+}
+
+.reservation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #eee8e2;
+}
+
+.confirm-button,
+.secondary-small-button,
+.cancel-small-button {
+  border-radius: 0.55rem;
+  padding: 0.55rem 0.85rem;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.confirm-button {
+  border: 1px solid #426148;
+  background: #426148;
+  color: #ffffff;
+}
+
+.secondary-small-button {
+  border: 1px solid #d6cec6;
+  background: #ffffff;
+  color: #514840;
+}
+
+.cancel-small-button {
+  border: 1px solid #d9b9b5;
+  background: #fff8f7;
+  color: #8b4741;
+}
+
+.confirm-button:disabled,
+.secondary-small-button:disabled,
+.cancel-small-button:disabled,
+.delete-small-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.reservation-empty {
+  border-radius: 0.75rem;
+  background: #f7f5f1;
+  padding: 1.25rem;
+  color: #746a62;
+  text-align: center;
+}
+.confirm-button,
+.secondary-small-button,
+.cancel-small-button,
+.delete-small-button {
+  border-radius: 0.55rem;
+  padding: 0.55rem 0.85rem;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.delete-small-button {
+  border: 1px solid #8b4741;
+  background: #8b4741;
+  color: #ffffff;
+}
 @media (max-width: 850px) {
   .editor-layout {
     grid-template-columns: 1fr;
@@ -1039,12 +1743,19 @@ onMounted(loadEvent)
       4rem;
   }
 
-  .form-grid {
+  .form-grid,
+  .reservation-stats,
+  .reservation-details {
     grid-template-columns: 1fr;
   }
 
   .full-width {
     grid-column: auto;
+  }
+
+  .reservations-heading,
+  .reservation-top {
+    flex-direction: column;
   }
 }
 </style>
