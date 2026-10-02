@@ -20,6 +20,7 @@ public class AppDbContext : DbContext
     public DbSet<Communication> Communications => Set<Communication>();
     public DbSet<Event> Events => Set<Event>();
     public DbSet<EventReservation> EventReservations => Set<EventReservation>();
+    public DbSet<AppUser> AppUsers => Set<AppUser>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -95,5 +96,19 @@ public class AppDbContext : DbContext
 
             entity.HasIndex(reservation => reservation.Email);
         });
+        modelBuilder.Entity<AppUser>(entity =>
+{
+    entity.HasIndex(user => user.Email)
+        .IsUnique();
+
+    entity.HasIndex(user => user.ExternalId)
+        .IsUnique();
+
+    entity.HasIndex(user => new
+    {
+        user.Role,
+        user.IsActive,
+    });
+});
     }
 }

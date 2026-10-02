@@ -180,6 +180,13 @@ onBeforeUnmount(() => {
           >
             Events
           </RouterLink>
+
+          <RouterLink
+  to="/admin/users"
+  class="admin-nav-link"
+>
+  Users
+</RouterLink>
         </nav>
 
         <div class="admin-actions">
@@ -668,6 +675,7 @@ onBeforeUnmount(() => {
     width: 100%;
 
     overflow-x: auto;
+    
   }
 
   .admin-actions {

@@ -23,6 +23,7 @@ import AdminCustomersView from '@/views/AdminCustomersView.vue'
 import AdminCustomerDetailView from '@/views/AdminCustomerDetailView.vue'
 import AdminEventsView from '@/views/AdminEventsView.vue'
 import AdminEventDetailView from '@/views/AdminEventDetailView.vue'
+import AdminUsersView from '@/views/AdminUsersView.vue'
 
 const router = createRouter({
   history: createWebHistory(
@@ -139,6 +140,11 @@ const router = createRouter({
           name: 'admin-event-detail',
           component: AdminEventDetailView,
         },
+        {
+  path: 'users',
+  name: 'admin-users',
+  component: AdminUsersView,
+},
       ],
     },
   ],

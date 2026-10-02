@@ -1901,6 +1901,259 @@ app.MapGet(
 );
 
 // =========================================================
+// ADMIN USERS - LIST
+// =========================================================
+
+app.MapGet(
+    "/api/admin/users",
+    async (AppDbContext db) =>
+    {
+        var users = await db.AppUsers
+            .AsNoTracking()
+            .OrderBy(user => user.FirstName)
+            .ThenBy(user => user.LastName)
+            .Select(user => new
+            {
+                user.Id,
+                user.Email,
+                user.FirstName,
+                user.LastName,
+                user.Role,
+                user.IsActive,
+                user.ExternalId,
+                user.CreatedAt,
+                user.UpdatedAt
+            })
+            .ToListAsync();
+
+        return Results.Ok(users);
+    }
+);
+
+// =========================================================
+// ADMIN USERS - CREATE
+// =========================================================
+
+app.MapPost(
+    "/api/admin/users",
+    async (
+        CreateAppUserRequest request,
+        AppDbContext db
+    ) =>
+    {
+        var email =
+            request.Email?.Trim().ToLowerInvariant()
+            ?? string.Empty;
+
+        var firstName =
+            request.FirstName?.Trim()
+            ?? string.Empty;
+
+        var lastName =
+            request.LastName?.Trim()
+            ?? string.Empty;
+
+        var role =
+            request.Role?.Trim()
+            ?? string.Empty;
+
+        if (
+            string.IsNullOrWhiteSpace(email) ||
+            string.IsNullOrWhiteSpace(firstName) ||
+            string.IsNullOrWhiteSpace(lastName)
+        )
+        {
+            return Results.BadRequest(new
+            {
+                Message =
+                    "Email, first name, and last name are required."
+            });
+        }
+
+        var allowedRoles = new[]
+        {
+            "Manager",
+            "Employee"
+        };
+
+        var normalizedRole =
+            allowedRoles.FirstOrDefault(
+                allowedRole =>
+                    allowedRole.Equals(
+                        role,
+                        StringComparison.OrdinalIgnoreCase
+                    )
+            );
+
+        if (normalizedRole is null)
+        {
+            return Results.BadRequest(new
+            {
+                Message =
+                    "Role must be Manager or Employee."
+            });
+        }
+
+        var emailExists =
+            await db.AppUsers.AnyAsync(user =>
+                user.Email.ToLower() == email
+            );
+
+        if (emailExists)
+        {
+            return Results.Conflict(new
+            {
+                Message =
+                    "A user with this email already exists."
+            });
+        }
+
+        var user = new AppUser
+        {
+            Email = email,
+            FirstName = firstName,
+            LastName = lastName,
+            Role = normalizedRole,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+
+        db.AppUsers.Add(user);
+
+        await db.SaveChangesAsync();
+
+        return Results.Created(
+            $"/api/admin/users/{user.Id}",
+            new
+            {
+                user.Id,
+                user.Email,
+                user.FirstName,
+                user.LastName,
+                user.Role,
+                user.IsActive,
+                user.ExternalId,
+                user.CreatedAt,
+                user.UpdatedAt
+            }
+        );
+    }
+);
+
+// =========================================================
+// ADMIN USERS - UPDATE
+// =========================================================
+
+app.MapPut(
+    "/api/admin/users/{id:int}",
+    async (
+        int id,
+        UpdateAppUserRequest request,
+        AppDbContext db
+    ) =>
+    {
+        var user =
+            await db.AppUsers.FindAsync(id);
+
+        if (user is null)
+        {
+            return Results.NotFound(new
+            {
+                Message = "User not found."
+            });
+        }
+
+        var email =
+            request.Email?.Trim().ToLowerInvariant()
+            ?? string.Empty;
+
+        var firstName =
+            request.FirstName?.Trim()
+            ?? string.Empty;
+
+        var lastName =
+            request.LastName?.Trim()
+            ?? string.Empty;
+
+        if (
+            string.IsNullOrWhiteSpace(email) ||
+            string.IsNullOrWhiteSpace(firstName) ||
+            string.IsNullOrWhiteSpace(lastName)
+        )
+        {
+            return Results.BadRequest(new
+            {
+                Message =
+                    "Email, first name, and last name are required."
+            });
+        }
+
+        var allowedRoles = new[]
+        {
+            "Manager",
+            "Employee"
+        };
+
+        var normalizedRole =
+            allowedRoles.FirstOrDefault(
+                allowedRole =>
+                    allowedRole.Equals(
+                        request.Role?.Trim(),
+                        StringComparison.OrdinalIgnoreCase
+                    )
+            );
+
+        if (normalizedRole is null)
+        {
+            return Results.BadRequest(new
+            {
+                Message =
+                    "Role must be Manager or Employee."
+            });
+        }
+
+        var emailExists =
+            await db.AppUsers.AnyAsync(existing =>
+                existing.Id != id &&
+                existing.Email.ToLower() == email
+            );
+
+        if (emailExists)
+        {
+            return Results.Conflict(new
+            {
+                Message =
+                    "A user with this email already exists."
+            });
+        }
+
+        user.Email = email;
+        user.FirstName = firstName;
+        user.LastName = lastName;
+        user.Role = normalizedRole;
+        user.IsActive = request.IsActive;
+        user.UpdatedAt =
+            DateTimeOffset.UtcNow;
+
+        await db.SaveChangesAsync();
+
+        return Results.Ok(new
+        {
+            user.Id,
+            user.Email,
+            user.FirstName,
+            user.LastName,
+            user.Role,
+            user.IsActive,
+            user.ExternalId,
+            user.CreatedAt,
+            user.UpdatedAt
+        });
+    }
+);
+
+// =========================================================
 // COMMUNICATIONS - CREATE
 // =========================================================
 
@@ -3056,4 +3309,18 @@ public record CreateEventReservationRequest(
 );
 public record UpdateEventReservationStatusRequest(
     string Status
+);
+public record CreateAppUserRequest(
+    string Email,
+    string FirstName,
+    string LastName,
+    string Role
+);
+
+public record UpdateAppUserRequest(
+    string Email,
+    string FirstName,
+    string LastName,
+    string Role,
+    bool IsActive
 );
