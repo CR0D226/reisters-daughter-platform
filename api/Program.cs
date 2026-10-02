@@ -2027,7 +2027,484 @@ app.MapGet(
         return Results.Ok(communications);
     }
 );
+// =========================================================
+// EVENTS - GET ALL
+// =========================================================
 
+app.MapGet(
+    "/api/events",
+    async (AppDbContext db) =>
+    {
+        var events = await db.Events
+            .AsNoTracking()
+            .OrderBy(eventItem => eventItem.StartDate)
+            .ThenBy(eventItem => eventItem.StartTime)
+            .Select(eventItem => new
+            {
+                eventItem.Id,
+                eventItem.Title,
+                eventItem.Description,
+                eventItem.Type,
+                eventItem.Status,
+                eventItem.StartDate,
+                eventItem.StartTime,
+                eventItem.EndDate,
+                eventItem.EndTime,
+                eventItem.Location,
+                eventItem.IsPublic,
+                eventItem.Capacity,
+                eventItem.BookingId,
+                eventItem.CreatedAt,
+                eventItem.UpdatedAt
+            })
+            .ToListAsync();
+
+        return Results.Ok(events);
+    }
+);
+
+// =========================================================
+// EVENTS - GET ONE
+// =========================================================
+
+app.MapGet(
+    "/api/events/{id:int}",
+    async (
+        int id,
+        AppDbContext db
+    ) =>
+    {
+        var eventItem = await db.Events
+            .AsNoTracking()
+            .Where(eventItem =>
+                eventItem.Id == id
+            )
+            .Select(eventItem => new
+            {
+                eventItem.Id,
+                eventItem.Title,
+                eventItem.Description,
+                eventItem.Type,
+                eventItem.Status,
+                eventItem.StartDate,
+                eventItem.StartTime,
+                eventItem.EndDate,
+                eventItem.EndTime,
+                eventItem.Location,
+                eventItem.IsPublic,
+                eventItem.Capacity,
+                eventItem.BookingId,
+                eventItem.CreatedAt,
+                eventItem.UpdatedAt
+            })
+            .FirstOrDefaultAsync();
+
+        return eventItem is null
+            ? Results.NotFound(new
+            {
+                Message = "Event not found."
+            })
+            : Results.Ok(eventItem);
+    }
+);
+
+// =========================================================
+// EVENTS - CREATE
+// =========================================================
+
+app.MapPost(
+    "/api/events",
+    async (
+        CreateEventRequest request,
+        AppDbContext db
+    ) =>
+    {
+        if (string.IsNullOrWhiteSpace(request.Title))
+        {
+            return Results.BadRequest(new
+            {
+                Message = "Event title is required."
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Type))
+        {
+            return Results.BadRequest(new
+            {
+                Message = "Event type is required."
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.StartDate))
+        {
+            return Results.BadRequest(new
+            {
+                Message = "Event start date is required."
+            });
+        }
+
+        if (request.Capacity.HasValue &&
+            request.Capacity.Value < 1)
+        {
+            return Results.BadRequest(new
+            {
+                Message =
+                    "Capacity must be greater than zero."
+            });
+        }
+
+        if (request.BookingId.HasValue)
+        {
+            var bookingExists = await db.Bookings
+                .AsNoTracking()
+                .AnyAsync(booking =>
+                    booking.Id == request.BookingId.Value
+                );
+
+            if (!bookingExists)
+            {
+                return Results.BadRequest(new
+                {
+                    Message = "Booking not found."
+                });
+            }
+        }
+
+        var eventItem = new Event
+        {
+            Title = request.Title.Trim(),
+            Description =
+                string.IsNullOrWhiteSpace(request.Description)
+                    ? null
+                    : request.Description.Trim(),
+            Type = request.Type.Trim(),
+            Status = "Draft",
+            StartDate = request.StartDate.Trim(),
+            StartTime = request.StartTime.Trim(),
+            EndDate =
+                string.IsNullOrWhiteSpace(request.EndDate)
+                    ? null
+                    : request.EndDate.Trim(),
+            EndTime =
+                string.IsNullOrWhiteSpace(request.EndTime)
+                    ? null
+                    : request.EndTime.Trim(),
+            Location =
+                string.IsNullOrWhiteSpace(request.Location)
+                    ? null
+                    : request.Location.Trim(),
+            IsPublic = request.IsPublic,
+            Capacity = request.Capacity,
+            BookingId = request.BookingId,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+
+        db.Events.Add(eventItem);
+
+        await db.SaveChangesAsync();
+
+        return Results.Created(
+            $"/api/events/{eventItem.Id}",
+            new
+            {
+                eventItem.Id,
+                eventItem.Title,
+                eventItem.Description,
+                eventItem.Type,
+                eventItem.Status,
+                eventItem.StartDate,
+                eventItem.StartTime,
+                eventItem.EndDate,
+                eventItem.EndTime,
+                eventItem.Location,
+                eventItem.IsPublic,
+                eventItem.Capacity,
+                eventItem.BookingId,
+                eventItem.CreatedAt,
+                eventItem.UpdatedAt
+            }
+        );
+    }
+);
+
+// =========================================================
+// EVENTS - UPDATE
+// =========================================================
+
+app.MapPut(
+    "/api/events/{id:int}",
+    async (
+        int id,
+        CreateEventRequest request,
+        AppDbContext db
+    ) =>
+    {
+        var eventItem = await db.Events
+            .FirstOrDefaultAsync(eventItem =>
+                eventItem.Id == id
+            );
+
+        if (eventItem is null)
+        {
+            return Results.NotFound(new
+            {
+                Message = "Event not found."
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Title))
+        {
+            return Results.BadRequest(new
+            {
+                Message = "Event title is required."
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Type))
+        {
+            return Results.BadRequest(new
+            {
+                Message = "Event type is required."
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.StartDate))
+        {
+            return Results.BadRequest(new
+            {
+                Message = "Event start date is required."
+            });
+        }
+
+        if (request.Capacity.HasValue &&
+            request.Capacity.Value < 1)
+        {
+            return Results.BadRequest(new
+            {
+                Message =
+                    "Capacity must be greater than zero."
+            });
+        }
+
+        if (request.BookingId.HasValue)
+        {
+            var bookingExists = await db.Bookings
+                .AsNoTracking()
+                .AnyAsync(booking =>
+                    booking.Id == request.BookingId.Value
+                );
+
+            if (!bookingExists)
+            {
+                return Results.BadRequest(new
+                {
+                    Message = "Booking not found."
+                });
+            }
+        }
+
+        eventItem.Title = request.Title.Trim();
+        eventItem.Description =
+            string.IsNullOrWhiteSpace(request.Description)
+                ? null
+                : request.Description.Trim();
+        eventItem.Type = request.Type.Trim();
+        eventItem.StartDate = request.StartDate.Trim();
+        eventItem.StartTime = request.StartTime.Trim();
+        eventItem.EndDate =
+            string.IsNullOrWhiteSpace(request.EndDate)
+                ? null
+                : request.EndDate.Trim();
+        eventItem.EndTime =
+            string.IsNullOrWhiteSpace(request.EndTime)
+                ? null
+                : request.EndTime.Trim();
+        eventItem.Location =
+            string.IsNullOrWhiteSpace(request.Location)
+                ? null
+                : request.Location.Trim();
+        eventItem.IsPublic = request.IsPublic;
+        eventItem.Capacity = request.Capacity;
+        eventItem.BookingId = request.BookingId;
+        eventItem.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await db.SaveChangesAsync();
+
+        return Results.Ok(new
+        {
+            eventItem.Id,
+            eventItem.Title,
+            eventItem.Description,
+            eventItem.Type,
+            eventItem.Status,
+            eventItem.StartDate,
+            eventItem.StartTime,
+            eventItem.EndDate,
+            eventItem.EndTime,
+            eventItem.Location,
+            eventItem.IsPublic,
+            eventItem.Capacity,
+            eventItem.BookingId,
+            eventItem.CreatedAt,
+            eventItem.UpdatedAt
+        });
+    }
+);
+
+// =========================================================
+// EVENTS - UPDATE STATUS
+// =========================================================
+
+app.MapPut(
+    "/api/events/{id:int}/status",
+    async (
+        int id,
+        UpdateEventStatusRequest request,
+        AppDbContext db
+    ) =>
+    {
+        var allowedStatuses = new[]
+        {
+            "Draft",
+            "Published",
+            "Completed",
+            "Cancelled"
+        };
+
+        var requestedStatus = request.Status.Trim();
+
+        if (!allowedStatuses.Contains(
+                requestedStatus,
+                StringComparer.OrdinalIgnoreCase))
+        {
+            return Results.BadRequest(new
+            {
+                Message =
+                    "Status must be Draft, Published, Completed, or Cancelled."
+            });
+        }
+
+        var normalizedStatus =
+            allowedStatuses.First(status =>
+                status.Equals(
+                    requestedStatus,
+                    StringComparison.OrdinalIgnoreCase
+                )
+            );
+
+        var eventItem = await db.Events
+            .FirstOrDefaultAsync(eventItem =>
+                eventItem.Id == id
+            );
+
+        if (eventItem is null)
+        {
+            return Results.NotFound(new
+            {
+                Message = "Event not found."
+            });
+        }
+
+        eventItem.Status = normalizedStatus;
+        eventItem.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await db.SaveChangesAsync();
+
+        return Results.Ok(new
+        {
+            eventItem.Id,
+            eventItem.Status,
+            eventItem.UpdatedAt
+        });
+    }
+);
+
+// =========================================================
+// PUBLIC EVENTS
+// Only events explicitly marked Public AND Published
+// are exposed to the public website.
+// =========================================================
+
+app.MapGet(
+    "/api/public/events",
+    async (AppDbContext db) =>
+    {
+        var events = await db.Events
+            .AsNoTracking()
+            .Where(eventItem =>
+                eventItem.IsPublic &&
+                eventItem.Status == "Published"
+            )
+            .OrderBy(eventItem =>
+                eventItem.StartDate
+            )
+            .ThenBy(eventItem =>
+                eventItem.StartTime
+            )
+            .Select(eventItem => new
+            {
+                eventItem.Id,
+                eventItem.Title,
+                eventItem.Description,
+                eventItem.Type,
+                eventItem.StartDate,
+                eventItem.StartTime,
+                eventItem.EndDate,
+                eventItem.EndTime,
+                eventItem.Location,
+                eventItem.Capacity
+            })
+            .ToListAsync();
+
+        return Results.Ok(events);
+    }
+);
+// =========================================================
+// PUBLIC EVENT DETAIL
+// Only Published + Public events can be viewed publicly.
+// =========================================================
+
+app.MapGet(
+    "/api/public/events/{id:int}",
+    async (
+        int id,
+        AppDbContext db
+    ) =>
+    {
+        var eventItem = await db.Events
+            .AsNoTracking()
+            .Where(eventItem =>
+                eventItem.Id == id &&
+                eventItem.IsPublic &&
+                eventItem.Status == "Published"
+            )
+            .Select(eventItem => new
+            {
+                eventItem.Id,
+                eventItem.Title,
+                eventItem.Description,
+                eventItem.Type,
+                eventItem.StartDate,
+                eventItem.StartTime,
+                eventItem.EndDate,
+                eventItem.EndTime,
+                eventItem.Location,
+                eventItem.Capacity
+            })
+            .FirstOrDefaultAsync();
+
+        if (eventItem is null)
+        {
+            return Results.NotFound(new
+            {
+                Message = "Event not found."
+            });
+        }
+
+        return Results.Ok(eventItem);
+    }
+);
 // =========================================================
 // START APPLICATION
 // =========================================================
@@ -2082,4 +2559,20 @@ public record CreateCommunicationRequest(
     string Body,
     string FromAddress,
     string ToAddress
+);
+public record CreateEventRequest(
+    string Title,
+    string? Description,
+    string Type,
+    string StartDate,
+    string StartTime,
+    string? EndDate,
+    string? EndTime,
+    string? Location,
+    bool IsPublic,
+    int? Capacity,
+    int? BookingId
+);
+public record UpdateEventStatusRequest(
+    string Status
 );
