@@ -1829,6 +1829,38 @@ app.MapGet(
                 }
             })
             .ToListAsync();
+        var pendingReservationCount =
+            await db.EventReservations
+                .AsNoTracking()
+                .CountAsync(reservation =>
+                    reservation.Status == "Pending"
+                );
+
+        var pendingReservations =
+            await db.EventReservations
+                .AsNoTracking()
+                .Where(reservation =>
+                    reservation.Status == "Pending"
+                )
+                .OrderByDescending(reservation =>
+                    reservation.CreatedAt
+                )
+                .Take(5)
+                .Select(reservation => new
+                {
+                    ReservationId = reservation.Id,
+                    reservation.EventId,
+                    EventTitle =
+                        reservation.Event.Title,
+                    reservation.FirstName,
+                    reservation.LastName,
+                    reservation.Email,
+                    reservation.Phone,
+                    reservation.GuestCount,
+                    reservation.Status,
+                    reservation.CreatedAt
+                })
+                .ToListAsync();
 
         return Results.Ok(new
         {
@@ -1852,13 +1884,18 @@ app.MapGet(
                     Confirmed = confirmedBookingCount,
                     InPreparation =
                         inPreparationBookingCount
-                }
+                },
+
+                PendingReservations =
+                    pendingReservationCount
             },
 
             RecentInquiries = recentInquiries,
             UpcomingBookings = upcomingBookings,
             QuotesNeedingAttention =
-                quotesNeedingAttention
+                quotesNeedingAttention,
+            PendingReservations =
+                pendingReservations
         });
     }
 );
@@ -1938,6 +1975,7 @@ app.MapPost(
         );
     }
 );
+
 // =========================================================
 // COMMUNICATIONS - GET ONE
 // =========================================================

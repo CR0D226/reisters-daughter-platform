@@ -1,16 +1,33 @@
 <script setup lang="ts">
-import { RouterView } from 'vue-router'
+import { computed } from 'vue'
+import {
+  RouterView,
+  useRoute,
+} from 'vue-router'
+
 import SiteHeader from '@/components/SiteHeader.vue'
 import SiteFooter from '@/components/SiteFooter.vue'
 import FloatingOrderButton from '@/components/FloatingOrderButton.vue'
+
+const route = useRoute()
+
+const isAdmin = computed(() =>
+  route.path.startsWith('/admin'),
+)
 </script>
 
 <template>
-  <SiteHeader />
+  <template v-if="isAdmin">
+    <RouterView />
+  </template>
 
-  <RouterView />
+  <template v-else>
+    <SiteHeader />
 
-  <SiteFooter />
+    <RouterView />
 
-  <FloatingOrderButton />
+    <SiteFooter />
+
+    <FloatingOrderButton />
+  </template>
 </template>
