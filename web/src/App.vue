@@ -11,15 +11,16 @@ import FloatingOrderButton from '@/components/FloatingOrderButton.vue'
 
 const route = useRoute()
 
-const isAdmin = computed(() =>
-  route.path.startsWith('/admin'),
+const isPortal = computed(() =>
+  route.path.startsWith('/admin') ||
+  route.path.startsWith('/employee')
 )
 </script>
 
 <template>
-  <template v-if="isAdmin">
-    <RouterView />
-  </template>
+  <template v-if="isPortal">
+  <RouterView />
+</template>
 
   <template v-else>
     <SiteHeader />

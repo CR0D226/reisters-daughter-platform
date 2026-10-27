@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { apiFetch } from '@/services/api'
 import {
   computed,
   onMounted,
@@ -15,6 +16,7 @@ interface AppUser {
   externalId: string | null
   createdAt: string
   updatedAt: string
+  positions: string[]
 }
 
 const users = ref<AppUser[]>([])
@@ -24,6 +26,230 @@ const errorMessage = ref('')
 const successMessage = ref('')
 
 const showCreateForm = ref(false)
+const showImportForm = ref(false)
+
+const importFileName = ref('')
+const importLoading = ref(false)
+const importFile = ref<File | null>(null)
+
+function handleImportFile(event: Event) {
+  const input = event.target as HTMLInputElement
+  importFile.value = input.files?.[0] ?? null
+  importFileName.value = importFile.value?.name ?? ''
+  importPreview.value = null
+  importRows.value = []
+  importError.value = ''
+}
+
+interface ImportRow {
+  firstName: string
+  lastName: string
+  email: string
+  positions: string[]
+}
+
+interface ImportPreviewRow extends ImportRow {
+  row: number
+  status: 'Ready' | 'Existing' | 'Invalid'
+  errors: string[]
+}
+
+interface ImportPreview {
+  total: number
+  ready: number
+  existing: number
+  invalid: number
+  employees: ImportPreviewRow[]
+}
+
+const importPreview = ref<ImportPreview | null>(null)
+const importRows = ref<ImportRow[]>([])
+const importError = ref('')
+
+function parseCsvLine(line: string): string[] {
+  const values: string[] = []
+  let current = ''
+  let quoted = false
+
+  for (let i = 0; i < line.length; i++) {
+    const character = line[i]
+
+    if (character === '"') {
+      if (quoted && line[i + 1] === '"') {
+        current += '"'
+        i++
+      } else {
+        quoted = !quoted
+      }
+    } else if (character === ',' && !quoted) {
+      values.push(current.trim())
+      current = ''
+    } else {
+      current += character
+    }
+  }
+
+  if (quoted) {
+    throw new Error('Unclosed quotation mark in CSV.')
+  }
+
+  values.push(current.trim())
+  return values
+}
+
+async function previewImport() {
+  if (!importFile.value) return
+
+  importLoading.value = true
+  importError.value = ''
+  importPreview.value = null
+  importRows.value = []
+
+  try {
+    const text = (await importFile.value.text())
+      .replace(/^\uFEFF/, '')
+
+    // Initial format: First,Last,Email,Positions
+    // Positions can contain multiple values separated by |
+    const lines = text.split(/\r?\n/)
+      .filter(line => line.trim())
+
+    if (lines.length < 2) {
+      throw new Error('CSV must contain a header and employee rows.')
+    }
+
+    const headers = parseCsvLine(lines[0]!)
+      .map(value => value.toLowerCase().replace(/\s+/g, ''))
+
+    const findColumn = (...names: string[]) =>
+      headers.findIndex(header => names.includes(header))
+
+    const firstIndex = findColumn('first', 'firstname')
+    const lastIndex = findColumn('last', 'lastname')
+    const emailIndex = findColumn('email', 'workemail')
+    const positionsIndex = findColumn('positions', 'position')
+
+    if ([firstIndex, lastIndex, emailIndex].includes(-1)) {
+      throw new Error('CSV requires First, Last, and Email columns.')
+    }
+
+    const rows: ImportRow[] = lines.slice(1).map(line => {
+      const columns = parseCsvLine(line)
+
+      return {
+        firstName: columns[firstIndex] ?? '',
+        lastName: columns[lastIndex] ?? '',
+        email: columns[emailIndex] ?? '',
+        positions: positionsIndex === -1
+          ? []
+          : (columns[positionsIndex] ?? '')
+              .split('|')
+              .map(position => position.trim())
+              .filter(Boolean),
+      }
+    })
+
+    // Kelsey already exists; her email will be corrected separately.
+    const employees = rows.filter(row =>
+      !(
+        row.firstName.toLowerCase() === 'kelsey' &&
+        row.lastName.toLowerCase() === 'marcus'
+      ),
+    )
+
+    if (employees.length === 0) {
+      throw new Error('No employees to preview.')
+    }
+
+    const response = await apiFetch(
+      '/api/admin/users/import/preview',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ employees }),
+      },
+    )
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      throw new Error(data.message ?? 'Unable to preview import.')
+    }
+
+    importRows.value = employees
+    importPreview.value = data as ImportPreview
+  } catch (error) {
+    importError.value = error instanceof Error
+      ? error.message
+      : 'Unable to read CSV.'
+  } finally {
+    importLoading.value = false
+  }
+}
+const confirmingImport = ref(false)
+
+async function confirmImport() {
+  if (
+    !importPreview.value ||
+    importPreview.value.invalid > 0 ||
+    importPreview.value.ready === 0 ||
+    confirmingImport.value
+  ) return
+
+  const confirmed = window.confirm(
+    `Import ${importPreview.value.ready} employees into the database?\n\n` +
+    'Existing users will be skipped. No Keycloak accounts will be created.'
+  )
+
+  if (!confirmed) return
+
+  confirmingImport.value = true
+  importError.value = ''
+  errorMessage.value = ''
+  successMessage.value = ''
+
+  try {
+    const response = await apiFetch(
+      '/api/admin/users/import/confirm',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          employees: importRows.value,
+        }),
+      },
+    )
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      throw new Error(
+        data.message ?? 'Unable to import employees.'
+      )
+    }
+
+    successMessage.value =
+      `${data.imported} employees imported successfully. ` +
+      `${data.skippedExisting} existing accounts skipped.`
+
+    importPreview.value = null
+    importRows.value = []
+    importFile.value = null
+    importFileName.value = ''
+    showImportForm.value = false
+
+    await loadUsers()
+  } catch (error) {
+    importError.value =
+      error instanceof Error
+        ? error.message
+        : 'Unable to import employees.'
+  } finally {
+    confirmingImport.value = false
+  }
+}
 
 const newUser = ref({
   email: '',
@@ -57,8 +283,8 @@ async function loadUsers() {
   errorMessage.value = ''
 
   try {
-    const response = await fetch(
-      'http://localhost:5128/api/admin/users',
+    const response = await apiFetch(
+      '/api/admin/users',
     )
 
     if (!response.ok) {
@@ -84,8 +310,8 @@ async function createUser() {
   successMessage.value = ''
 
   try {
-    const response = await fetch(
-      'http://localhost:5128/api/admin/users',
+    const response = await apiFetch(
+      '/api/admin/users',
       {
         method: 'POST',
 
@@ -143,8 +369,8 @@ async function updateUser(
   }
 
   try {
-    const response = await fetch(
-      `http://localhost:5128/api/admin/users/${user.id}`,
+    const response = await apiFetch(
+      `/api/admin/users/${user.id}`,
       {
         method: 'PUT',
 
@@ -158,6 +384,7 @@ async function updateUser(
           lastName: updatedUser.lastName,
           role: updatedUser.role,
           isActive: updatedUser.isActive,
+          positions: updatedUser.positions,
         }),
       },
     )
@@ -183,7 +410,17 @@ async function updateUser(
         : 'Unable to update user.'
   }
 }
+async function toggleQualification(
+  user: AppUser,
+  position: string,
+  checked: boolean,
+) {
+  const positions = checked
+    ? [...new Set([...(user.positions ?? []), position])]
+    : (user.positions ?? []).filter(p => p !== position)
 
+  await updateUser(user, { positions })
+}
 function formatDate(value: string) {
   return new Intl.DateTimeFormat(
     undefined,
@@ -214,18 +451,138 @@ onMounted(loadUsers)
         </p>
       </div>
 
-      <button
-        type="button"
-        class="primary-button"
-        @click="showCreateForm = !showCreateForm"
-      >
-        {{
-          showCreateForm
-            ? 'Cancel'
-            : '+ Add User'
-        }}
-      </button>
+      <div class="page-actions">
+  <button
+    type="button"
+    class="primary-button"
+    @click="showImportForm = !showImportForm"
+  >
+    {{ showImportForm ? 'Cancel Import' : 'Import Employees' }}
+  </button>
+
+  <button
+    type="button"
+    class="primary-button"
+    @click="showCreateForm = !showCreateForm"
+  >
+    {{ showCreateForm ? 'Cancel' : '+ Add User' }}
+   </button>
+    </div> <!-- Closes page-actions -->
+  </div>
+  <section
+  v-if="showImportForm"
+  class="create-card"
+>
+  <div class="section-heading">
+    <div>
+      <span class="eyebrow">Staff Management</span>
+      <h2>Import Employees</h2>
     </div>
+  </div>
+
+  <p>
+    Upload a CSV file containing employee names,
+    emails, and positions. You'll review the
+    records before importing them.
+  </p>
+
+  <div class="form-grid">
+    <label class="wide-field">
+      <span>Employee CSV File</span>
+
+      <input
+        type="file"
+        accept=".csv,text/csv"
+        @change="handleImportFile"
+      />
+    </label>
+  </div>
+
+  <div v-if="importFileName" class="form-actions">
+    <p>Selected: {{ importFileName }}</p>
+
+    <button
+      type="button"
+      class="primary-button"
+      :disabled="importLoading"
+      @click="previewImport"
+    >
+      {{ importLoading ? 'Checking…' : 'Preview Import' }}
+    </button>
+  </div>
+
+
+<p v-if="importError" class="message error-message">
+  {{ importError }}
+</p>
+
+<div v-if="importPreview" class="import-results">
+  <h3>Import Preview</h3>
+
+  <p>
+    {{ importPreview.total }} checked ·
+    {{ importPreview.ready }} ready ·
+    {{ importPreview.existing }} existing ·
+    {{ importPreview.invalid }} invalid
+  </p>
+
+  <div class="import-table-wrap">
+    <table class="import-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Positions</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        <tr
+          v-for="employee in importPreview.employees"
+          :key="employee.row"
+        >
+          <td>{{ employee.firstName }} {{ employee.lastName }}</td>
+          <td>{{ employee.email }}</td>
+          <td>{{ employee.positions.join(', ') || 'Not assigned' }}</td>
+          <td>
+            {{ employee.status }}
+            <small v-if="employee.errors.length">
+              {{ employee.errors.join('; ') }}
+            </small>
+          </td>
+        </tr>
+      </tbody>
+        </table>
+  </div>
+
+  <div class="form-actions">
+    <button
+      type="button"
+      class="primary-button"
+      :disabled="
+        confirmingImport ||
+        importLoading ||
+        importPreview.invalid > 0 ||
+        importPreview.ready === 0
+      "
+      @click="confirmImport"
+    >
+      {{
+        confirmingImport
+          ? 'Importing Employees…'
+          : `Confirm Import (${importPreview.ready})`
+      }}
+    </button>
+  </div>
+
+  <p>
+    Existing accounts will be skipped. Imported employees
+    will not receive login access until their Keycloak
+    identities are connected.
+  </p>
+</div>
+</section>
 
     <div class="stats-grid">
       <div class="stat-card">
@@ -439,6 +796,34 @@ onMounted(loadUsers)
               Employee
             </option>
           </select>
+          <div
+  v-if="user.role === 'Employee'"
+  class="employee-qualifications"
+>
+  <span class="qualification-heading">
+    Qualified Positions
+  </span>
+
+  <label
+    v-for="position in ['Barista', 'Cashier', 'Baker']"
+    :key="position"
+    class="qualification-option"
+  >
+    <input
+      type="checkbox"
+      :checked="user.positions?.includes(position) ?? false"
+      @change="
+        toggleQualification(
+          user,
+          position,
+          ($event.target as HTMLInputElement).checked
+        )
+      "
+    />
+
+    {{ position }}
+  </label>
+</div>
 
           <button
             type="button"
@@ -813,6 +1198,12 @@ onMounted(loadUsers)
   font-size: 0.85rem;
 }
 
+.page-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
 @media (max-width: 850px) {
   .stats-grid {
     grid-template-columns: repeat(2, 1fr);
@@ -831,7 +1222,57 @@ onMounted(loadUsers)
     justify-self: start;
   }
 }
+.import-results {
+  margin-top: 1.5rem;
+}
 
+.import-table-wrap {
+  overflow-x: auto;
+}
+
+.import-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.import-table th,
+.import-table td {
+  padding: 0.8rem;
+  text-align: left;
+  border-bottom: 1px solid #e5ded6;
+}
+
+.import-table small {
+  display: block;
+  color: #8b4741;
+}
+
+.employee-qualifications {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 1rem;
+}
+
+.qualification-heading {
+  width: 100%;
+  font-size: 0.75rem;
+  font-weight: 600;
+  opacity: 0.7;
+}
+
+.qualification-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.qualification-option input {
+  accent-color: #7b5b42;
+}
 @media (max-width: 600px) {
   .users-page {
     width: min(100% - 2rem, 1180px);

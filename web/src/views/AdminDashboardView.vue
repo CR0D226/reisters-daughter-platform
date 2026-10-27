@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { apiFetch } from '@/services/api'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -164,8 +165,8 @@ async function loadDashboard() {
   error.value = ''
 
   try {
-    const response = await fetch(
-      'http://localhost:5128/api/admin/dashboard',
+    const response = await apiFetch(
+      '/api/admin/dashboard',
     )
 
     if (!response.ok) {

@@ -35,6 +35,9 @@ public class Event
 
     public Booking? Booking { get; set; }
 
+    // Optional cover image stored by the event image service.
+    public string? CoverImagePath { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;

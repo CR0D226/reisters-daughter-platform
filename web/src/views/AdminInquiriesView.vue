@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { apiFetch } from '@/services/api'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 
 // --------------------------------------------------
@@ -59,7 +60,49 @@ const statuses = [
   'Closed',
 ]
 
+const openStatusId = ref<number | null>(null)
 
+function toggleStatusMenu(id: number) {
+  openStatusId.value = openStatusId.value === id ? null : id
+}
+
+function closeStatusMenu() {
+  openStatusId.value = null
+}
+
+function selectStatus(inquiry: Inquiry, status: string) {
+  closeStatusMenu()
+
+  if (status === inquiry.status) return
+
+  void updateStatus(inquiry, status)
+}
+function handleStatusOutsideClick(event: MouseEvent) {
+  const target = event.target
+
+  if (
+    target instanceof Element &&
+    !target.closest('.custom-status')
+  ) {
+    closeStatusMenu()
+  }
+}
+
+function handleStatusEscape(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    closeStatusMenu()
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleStatusOutsideClick)
+  document.addEventListener('keydown', handleStatusEscape)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleStatusOutsideClick)
+  document.removeEventListener('keydown', handleStatusEscape)
+})
 // --------------------------------------------------
 // LOAD INQUIRIES
 // --------------------------------------------------
@@ -69,8 +112,8 @@ async function loadInquiries() {
   errorMessage.value = ''
 
   try {
-    const response = await fetch(
-      'http://localhost:5128/api/inquiries',
+    const response = await apiFetch(
+      '/api/inquiries',
     )
 
     if (!response.ok) {
@@ -114,8 +157,8 @@ async function updateStatus(
     newStatus
 
   try {
-    const response = await fetch(
-      `http://localhost:5128/api/inquiries/${inquiry.id}/status`,
+    const response = await apiFetch(
+      `/api/inquiries/${inquiry.id}/status`,
       {
         method: 'PATCH',
 
@@ -332,36 +375,43 @@ onMounted(() => {
               </span>
 
 
-              <select
-                class="status-select"
-                :class="
-                  inquiry.status.toLowerCase()
-                "
-                :value="inquiry.status"
-                :disabled="
-                  updatingInquiryId ===
-                  inquiry.id
-                "
-                @change="
-                  updateStatus(
-                    inquiry,
-                    (
-                      $event.target as
-                      HTMLSelectElement
-                    ).value,
-                  )
-                "
-              >
 
-                <option
-                  v-for="status in statuses"
-                  :key="status"
-                  :value="status"
-                >
-                  {{ status }}
-                </option>
+<div class="custom-status" :class="{ 'is-open': openStatusId === inquiry.id }">
+  <button
+    type="button"
+    class="status-trigger"
+    :class="inquiry.status.toLowerCase()"
+    :disabled="updatingInquiryId === inquiry.id"
+    :aria-expanded="openStatusId === inquiry.id"
+    aria-haspopup="true"
+    @click="toggleStatusMenu(inquiry.id)"
+  >
+    <span>{{ inquiry.status }}</span>
+    <span class="status-chevron" aria-hidden="true">⌄</span>
+  </button>
 
-              </select>
+  <div
+    v-if="openStatusId === inquiry.id"
+    class="status-menu"
+    role="group"
+    aria-label="Change inquiry status"
+  >
+    <button
+      v-for="status in statuses"
+      :key="status"
+      type="button"
+      class="status-option"
+      :class="{ selected: inquiry.status === status }"
+      :aria-pressed="inquiry.status === status"
+      @click="selectStatus(inquiry, status)"
+    >
+      <span class="status-dot" :class="status.toLowerCase()"></span>
+      <span>{{ status }}</span>
+      <span v-if="inquiry.status === status" class="status-check" aria-hidden="true">✓</span>
+    </button>
+  </div>
+</div>
+
 
             </div>
 
@@ -408,7 +458,7 @@ onMounted(() => {
 
               <strong>
                 {{
-                   formatTime(inquiry.eventTime) 
+                   formatTime(inquiry.eventTime)
                 }}
               </strong>
             </div>
@@ -1167,4 +1217,423 @@ onMounted(() => {
 .view-button:hover {
   opacity: 0.85;
 }
+
+/* ==========================================
+   ADMIN PORTAL DESIGN CONSISTENCY
+   ========================================== */
+
+.admin-page {
+  min-height: 100%;
+  padding: 40px 32px 64px;
+  background: #faf7f9;
+  color: #30252d;
+}
+
+.admin-container {
+  width: 100%;
+  max-width: 1450px;
+  margin: 0 auto;
+}
+
+/* Page header */
+
+.admin-header {
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 30px;
+}
+
+.eyebrow {
+  margin-bottom: 10px;
+  color: #8b526f;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+}
+
+.admin-header h1 {
+  margin: 0;
+  color: #282528;
+  font-size: clamp(30px, 3vw, 40px);
+  font-weight: 750;
+  line-height: 1.15;
+  letter-spacing: -0.04em;
+}
+
+.admin-header p:last-child {
+  margin-top: 10px;
+  color: #756c73;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* Inquiry count */
+
+.inquiry-count {
+  min-width: 145px;
+  padding: 18px 22px;
+  background: #fff;
+  color: #30252d;
+  border: 1px solid #e9dfe5;
+  border-radius: 14px;
+  box-shadow: 0 4px 18px rgb(90 45 70 / 5%);
+}
+
+.inquiry-count strong {
+  font-size: 30px;
+  line-height: 1.2;
+  letter-spacing: -0.04em;
+}
+
+.inquiry-count span {
+  color: #756c73;
+  font-size: 12px;
+}
+
+/* Inquiry cards */
+
+.inquiry-list {
+  gap: 16px;
+}
+
+.inquiry-card {
+  padding: 24px;
+  background: #fff;
+  border: 1px solid #e9dfe5;
+  border-radius: 14px;
+  box-shadow: 0 4px 18px rgb(90 45 70 / 5%);
+}
+
+.card-header {
+  align-items: flex-start;
+  gap: 20px;
+  margin-bottom: 22px;
+}
+
+.inquiry-meta {
+  color: #928991;
+  font-size: 12px;
+}
+
+.card-header h2 {
+  color: #30252d;
+  font-size: 21px;
+  letter-spacing: -0.02em;
+}
+
+.card-header p {
+  color: #756c73;
+  font-size: 13px;
+}
+
+/* Status controls */
+
+.status-label {
+  color: #928991;
+  font-size: 11px;
+}
+
+.status-select {
+  min-height: 40px;
+  border: 1px solid #e9dfe5;
+  font-size: 12px;
+}
+
+/* Event information */
+
+.event-summary {
+  gap: 16px;
+  padding: 20px;
+  background: #faf7f9;
+  border: 1px solid #f0e7ec;
+  border-radius: 10px;
+}
+
+.event-summary span,
+.detail-block span,
+.extra-detail span,
+.notes span {
+  color: #928991;
+  font-size: 11px;
+}
+
+.details-grid {
+  gap: 18px;
+  margin-top: 22px;
+}
+
+.contact-row {
+  border-top-color: #e9dfe5;
+}
+
+.contact-row a {
+  color: #8b526f;
+}
+
+.notes p {
+  color: #756c73;
+}
+
+/* View details button */
+
+.view-button {
+  margin-top: 22px;
+  padding: 11px 17px;
+  background: #8b526f;
+  color: #fff;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.view-button:hover {
+  background: #70405a;
+  opacity: 1;
+}
+
+/* Empty and error states */
+
+.state-message {
+  padding: 36px;
+  border: 1px solid #e9dfe5;
+  border-radius: 14px;
+  background: #fff;
+}
+
+/* Responsive */
+
+@media (max-width: 800px) {
+  .admin-page {
+    padding: 28px 20px 48px;
+  }
+
+  .admin-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .inquiry-count {
+    width: 100%;
+  }
+
+  .event-summary,
+  .details-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Refined inquiry status dropdown */
+
+.status-control {
+  align-items: flex-start;
+  gap: 7px;
+}
+
+.status-label {
+  color: #756c73;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.status-select {
+  appearance: none;
+  -webkit-appearance: none;
+
+  min-width: 150px;
+  min-height: 42px;
+  padding: 10px 38px 10px 15px;
+
+  border: 1px solid #e9dfe5;
+  border-radius: 9px;
+
+  font-size: 13px;
+  font-weight: 700;
+
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23756c73' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+
+  cursor: pointer;
+}
+
+.status-select:focus-visible {
+  outline: 2px solid #8b526f;
+  outline-offset: 2px;
+}
+
+.status-select:hover:not(:disabled) {
+  border-color: #8b526f;
+}
+
+/* Custom inquiry status dropdown */
+
+.status-control {
+  align-items: flex-end;
+}
+
+.custom-status {
+  position: relative;
+  min-width: 150px;
+}
+
+.custom-status.is-open {
+  z-index: 20;
+}
+
+.status-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 13px;
+  border: 1px solid #e9dfe5;
+  border-radius: 9px;
+  color: #30252d;
+  background: #faf7f9;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.status-trigger.new {
+  background: #e5efe7;
+  color: #31593a;
+}
+
+.status-trigger.contacted {
+  background: #e8edf4;
+  color: #334e70;
+}
+
+.status-trigger.quoted {
+  background: #f5edd8;
+  color: #72591c;
+}
+
+.status-trigger.booked {
+  background: #e4efe9;
+  color: #25583d;
+}
+
+.status-trigger.closed {
+  background: #ecebea;
+  color: #66615a;
+}
+
+.status-trigger:hover:not(:disabled) {
+  border-color: #8b526f;
+}
+
+.status-trigger:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.status-chevron {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.status-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  width: 190px;
+  padding: 6px;
+  background: #fff;
+  border: 1px solid #e9dfe5;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgb(48 37 45 / 15%);
+}
+
+.status-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 12px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #30252d;
+  text-align: left;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.status-option:hover,
+.status-option.selected {
+  background: #f4e3ec;
+}
+
+.status-check {
+  margin-left: auto;
+  color: #8b526f;
+  font-weight: 800;
+}
+
+.status-dot {
+  flex-shrink: 0;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #999;
+}
+
+.status-dot.new {
+  background: #5b9b70;
+}
+
+.status-dot.contacted {
+  background: #6e94c1;
+}
+
+.status-dot.quoted {
+  background: #c6a34c;
+}
+
+.status-dot.booked {
+  background: #40815b;
+}
+
+.status-dot.closed {
+  background: #929292;
+}
+
+.status-trigger:focus-visible,
+.status-option:focus-visible {
+  outline: 2px solid #8b526f;
+  outline-offset: 2px;
+}
+
+@media (max-width: 500px) {
+  .admin-page {
+    padding: 24px 16px 48px;
+  }
+
+  .inquiry-card {
+    padding: 18px;
+  }
+
+  .card-header {
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .status-control {
+    align-items: flex-start;
+  }
+
+  .event-summary,
+  .details-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 </style>

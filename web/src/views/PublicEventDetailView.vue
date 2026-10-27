@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { API_BASE } from '../config/api'
 import {
   computed,
   onMounted,
@@ -22,6 +23,7 @@ interface PublicEvent {
   endTime: string | null
   location: string | null
   capacity: number | null
+  coverImagePath: string | null
 }
 
 interface ReservationResponse {
@@ -83,7 +85,7 @@ async function loadEvent() {
 
   try {
     const response = await fetch(
-      `http://localhost:5128/api/public/events/${eventId.value}`,
+      `${API_BASE}/api/public/events/${eventId.value}`,
     )
 
     if (response.status === 404) {
@@ -122,7 +124,7 @@ async function submitReservation() {
 
   try {
     const response = await fetch(
-      `http://localhost:5128/api/public/events/${eventId.value}/reservations`,
+      `${API_BASE}/api/public/events/${eventId.value}/reservations`,
       {
         method: 'POST',
         headers: {
@@ -326,11 +328,12 @@ onMounted(loadEvent)
 
     <template v-else-if="event">
 
-      <!-- HERO -->
-
-      <section class="event-hero">
-        <div class="hero-inner">
-
+      <!-- EVENT SPLIT HERO V1 -->
+      <section
+        class="event-hero split-event-hero"
+        :class="{ 'without-cover': !event.coverImagePath }"
+      >
+        <div class="split-hero-content">
           <RouterLink
             class="back-link"
             to="/events"
@@ -338,21 +341,58 @@ onMounted(loadEvent)
             ← All Events
           </RouterLink>
 
-          <p class="eyebrow">
-            {{ event.type }}
-          </p>
+          <div class="split-hero-copy">
+            <p class="eyebrow">
+              {{ event.type }}
+            </p>
 
-          <h1>
-            {{ event.title }}
-          </h1>
+            <h1>{{ event.title }}</h1>
 
-          <p
-            v-if="event.description"
-            class="hero-description"
-          >
-            {{ event.description }}
-          </p>
+            <p
+              v-if="event.description"
+              class="hero-description"
+            >
+              {{ event.description }}
+            </p>
 
+            <div class="hero-event-facts">
+              <div>
+                <span class="hero-fact-label">Date</span>
+                <strong>{{ formatDate(event.startDate) }}</strong>
+                <span v-if="multiDay && event.endDate">
+                  Through {{ formatDate(event.endDate) }}
+                </span>
+              </div>
+
+              <div>
+                <span class="hero-fact-label">Time</span>
+                <strong>{{ timeDisplay }}</strong>
+              </div>
+
+              <div v-if="event.location">
+                <span class="hero-fact-label">Location</span>
+                <strong>{{ event.location }}</strong>
+              </div>
+            </div>
+
+            <a
+              class="hero-reserve-button"
+              href="#event-reservations"
+            >
+              Reserve Your Spot
+              <span aria-hidden="true">→</span>
+            </a>
+          </div>
+        </div>
+
+        <div
+          v-if="event.coverImagePath"
+          class="split-hero-image"
+        >
+          <img
+            :src="`${API_BASE}/api/public/events/${event.id}/cover-image`"
+            :alt="`${event.title} cover image`"
+          />
         </div>
       </section>
 
@@ -453,7 +493,7 @@ onMounted(loadEvent)
 
           <!-- RESERVATION -->
 
-          <aside class="reservation-card">
+          <aside id="event-reservations" class="reservation-card">
             <p class="eyebrow">
               Reservations
             </p>
@@ -1105,6 +1145,295 @@ onMounted(loadEvent)
 
   .state-section {
     padding: 80px 20px;
+  }
+}
+
+
+/* THE REISTER'S DAUGHTER — BRANDING */
+
+.event-detail-page {
+  background: #FFF8F1;
+  color: #1C1C1C;
+}
+
+.event-hero {
+  background: #F6D5DF;
+}
+
+.eyebrow,
+.detail-label,
+.back-link {
+  color: #A34366;
+}
+
+.details-grid {
+  border-top-color: #E8B9C8;
+  border-bottom-color: #E8B9C8;
+}
+
+.detail {
+  border-right-color: #E8B9C8;
+}
+
+.reservation-card {
+  background: #FFFFFF;
+  color: #1C1C1C;
+  border: 1px solid #E8B9C8;
+  box-shadow: 0 12px 35px rgba(100, 40, 60, 0.07);
+}
+
+.reservation-card .eyebrow {
+  color: #A34366;
+}
+
+.reservation-card > p {
+  color: #625C52;
+}
+
+.reservation-form label > span {
+  color: #453D39;
+}
+
+.reservation-form small {
+  color: #766C66;
+}
+
+.reservation-form input,
+.reservation-form textarea {
+  background: #FFFFFF;
+  border: 1px solid #DCC9CC;
+  color: #1C1C1C;
+}
+
+.reservation-form input:focus,
+.reservation-form textarea:focus {
+  border-color: #C85F83;
+  outline: 2px solid #C85F83;
+  outline-offset: 1px;
+}
+
+.reservation-form textarea::placeholder {
+  color: #817771;
+}
+
+.reserve-button,
+.secondary-button {
+  background: #C85F83;
+  color: #FFFFFF;
+  border-radius: 999px;
+}
+
+.reservation-error {
+  background: #FBE9EC;
+  border-color: #E8B9C8;
+  color: #8B283F;
+}
+
+.success-box {
+  background: #FFF8F1;
+  border-color: #E8B9C8;
+}
+
+.success-label,
+.confirmation-note {
+  color: #625C52;
+}
+
+.private-events {
+  background: #F6D5DF;
+  color: #1C1C1C;
+}
+
+.private-inner .eyebrow {
+  color: #A34366;
+}
+
+.private-inner > p {
+  color: #625C52;
+}
+
+.inquiry-button,
+.back-button {
+  background: #C85F83;
+  color: #FFFFFF;
+}
+
+@media (max-width: 600px) {
+  .detail {
+    border-right: 0;
+    border-bottom-color: #E8B9C8;
+  }
+}
+</style>
+
+
+<style scoped>
+/* EVENT SPLIT HERO V1 */
+
+.split-event-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  min-height: 610px;
+  padding: 0;
+  background: #F6D5DF;
+  border-bottom: 1px solid rgba(47, 42, 38, 0.1);
+}
+
+.split-hero-content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 52px clamp(28px, 5vw, 100px) 72px;
+}
+
+.split-hero-content .back-link {
+  align-self: flex-start;
+  margin-bottom: 65px;
+  color: #A34366;
+}
+
+.split-hero-copy {
+  max-width: 680px;
+  margin: auto 0;
+}
+
+.split-hero-copy .eyebrow {
+  color: #A34366;
+}
+
+.split-hero-copy h1 {
+  overflow-wrap: anywhere;
+  font-size: clamp(3.2rem, 6vw, 6.7rem);
+  line-height: 0.98;
+}
+
+.split-hero-copy .hero-description {
+  margin-top: 24px;
+  font-size: 1.05rem;
+  line-height: 1.65;
+}
+
+.hero-event-facts {
+  display: grid;
+  gap: 16px;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(47, 42, 38, 0.18);
+}
+
+.hero-event-facts > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hero-fact-label {
+  color: #A34366;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.hero-event-facts strong {
+  font-size: 0.98rem;
+  line-height: 1.45;
+}
+
+.hero-reserve-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 30px;
+  width: fit-content;
+  margin-top: 30px;
+  padding: 15px 24px;
+  border-radius: 999px;
+  background: #A34366;
+  color: white;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background 0.2s ease;
+}
+
+.hero-reserve-button:hover {
+  background: #82334f;
+}
+
+.split-hero-image {
+  min-height: 100%;
+  overflow: hidden;
+}
+
+.split-hero-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 610px;
+  object-fit: cover;
+}
+
+.split-event-hero.without-cover {
+  grid-template-columns: 1fr;
+  min-height: 440px;
+}
+
+.without-cover .split-hero-content {
+  max-width: 1100px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+#event-reservations {
+  scroll-margin-top: 110px;
+}
+
+@media (max-width: 850px) {
+  .split-event-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .split-hero-content {
+    padding: 36px 28px 48px;
+  }
+
+  .split-hero-content .back-link {
+    margin-bottom: 38px;
+  }
+
+  .split-hero-image {
+    height: 360px;
+  }
+
+  .split-hero-image img {
+    min-height: 0;
+    height: 100%;
+  }
+}
+
+@media (max-width: 600px) {
+  .split-hero-content {
+    padding: 30px 20px 42px;
+  }
+
+  .split-hero-copy h1 {
+    font-size: clamp(3rem, 12vw, 4.5rem);
+  }
+
+  .split-hero-image {
+    height: 290px;
+  }
+
+  .hero-reserve-button {
+    width: 100%;
+    box-sizing: border-box;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
   }
 }
 </style>

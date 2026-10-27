@@ -80,7 +80,7 @@ const menuCategories = [
 <style scoped>
 .featured-menu {
   padding: 100px 6%;
-  background: #ffffff;
+  background: #FFF8F1;
 }
 
 .section-heading {
@@ -118,7 +118,7 @@ h2 {
   width: 100%;
   aspect-ratio: 4 / 3;
   overflow: hidden;
-  background: #f0ece4;
+  background: #F6D5DF;
 }
 
 .menu-image {
@@ -150,7 +150,7 @@ h3 {
   max-width: 320px;
   margin: 12px 0 0;
   line-height: 1.6;
-  color: #625c52;
+  color: #62504D;
 }
 
 .explore-link {

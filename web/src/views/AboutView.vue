@@ -189,7 +189,7 @@ import teaImage from '@/assets/images/tea.jpg'
 </template>
 <style scoped>
 .about-page {
-  background: #f7f4ee;
+  background: #FFF8F1;
   color: #1c1c1c;
 }
 
@@ -202,6 +202,7 @@ import teaImage from '@/assets/images/tea.jpg'
 }
 
 .hero-copy {
+  background: #F6D5DF;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -209,6 +210,7 @@ import teaImage from '@/assets/images/tea.jpg'
 }
 
 .eyebrow {
+  color: #A34366;
   margin: 0 0 20px;
   font-size: 0.75rem;
   font-weight: 700;
@@ -295,6 +297,7 @@ import teaImage from '@/assets/images/tea.jpg'
 }
 
 .feature-copy {
+  background: #FFF8F1;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -353,6 +356,8 @@ import teaImage from '@/assets/images/tea.jpg'
 /* CLOSING */
 
 .closing-section {
+  background: #F6D5DF;
+  border-radius: 28px;
   max-width: 900px;
   margin: 80px auto 0;
   padding: 120px 6% 140px;
@@ -378,7 +383,7 @@ import teaImage from '@/assets/images/tea.jpg'
   margin-top: 25px;
   padding: 15px 24px;
 
-  background: #1c1c1c;
+  background: #C85F83;
   color: white;
 
   font-weight: 700;

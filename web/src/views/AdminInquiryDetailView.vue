@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { apiFetch } from '@/services/api'
 import { onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import QuoteBuilder from '@/components/admin/QuoteBuilder.vue'
@@ -184,8 +185,8 @@ async function loadQuotes() {
   quotesError.value = ''
 
   try {
-    const response = await fetch(
-      `http://localhost:5128/api/inquiries/${route.params.id}/quotes`,
+    const response = await apiFetch(
+      `/api/inquiries/${route.params.id}/quotes`,
     )
 
     if (!response.ok) {
@@ -212,8 +213,8 @@ async function loadInquiry() {
   errorMessage.value = ''
 
   try {
-    const response = await fetch(
-      `http://localhost:5128/api/inquiries/${route.params.id}`,
+    const response = await apiFetch(
+      `/api/inquiries/${route.params.id}`,
     )
 
     if (response.status === 404) {
@@ -252,8 +253,8 @@ async function addNote() {
   savingNote.value = true
 
   try {
-    const response = await fetch(
-      `http://localhost:5128/api/inquiries/${route.params.id}/notes`,
+    const response = await apiFetch(
+      `/api/inquiries/${route.params.id}/notes`,
       {
         method: 'POST',
 

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { API_BASE } from '../config/api'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
@@ -156,7 +157,7 @@ async function loadQuote() {
 
   try {
     const response = await fetch(
-      `http://localhost:5128/api/public/quotes/${encodeURIComponent(token.value)}`,
+      `${API_BASE}/api/public/quotes/${encodeURIComponent(token.value)}`,
     )
 
     if (!response.ok) {
@@ -207,7 +208,7 @@ async function acceptQuote() {
 
   try {
     const response = await fetch(
-      `http://localhost:5128/api/public/quotes/${encodeURIComponent(token.value)}/accept`,
+      `${API_BASE}/api/public/quotes/${encodeURIComponent(token.value)}/accept`,
       {
         method: 'POST',
       },

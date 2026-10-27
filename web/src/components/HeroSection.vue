@@ -18,7 +18,7 @@ import heroImage from '@/assets/images/front-bar-area.jpg'
       </p>
 
       <div class="hero-actions">
-        <a class="primary-button" href="#">
+        <a class="primary-button" href="https://order.toasttab.com/online/the-reister-s-daughter-202-main-street" target="_blank" rel="noopener noreferrer">
           Order Online
         </a>
 
@@ -42,7 +42,7 @@ import heroImage from '@/assets/images/front-bar-area.jpg'
   min-height: calc(100vh - 88px);
   display: grid;
   grid-template-columns: 1fr 1fr;
-  background: #f7f4ee;
+  background: #FFF8F1;
 }
 
 .hero-copy {
@@ -97,12 +97,12 @@ h1 {
 }
 
 .primary-button {
-  background: #1c1c1c;
+  background: #C85F83;
   color: #ffffff;
 }
 
 .secondary-button {
-  border: 1px solid #1c1c1c;
+  border: 1px solid #C85F83;
 }
 
 .primary-button:hover,
@@ -111,7 +111,7 @@ h1 {
 }
 
 .secondary-button:hover {
-  background: #1c1c1c;
+  background: #C85F83;
   color: #ffffff;
 }
 

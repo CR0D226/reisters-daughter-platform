@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { apiFetch } from '@/services/api'
 
 interface Customer {
   id: number
@@ -57,9 +58,9 @@ async function loadCustomers() {
   error.value = ''
 
   try {
-    const response = await fetch(
-      'http://localhost:5128/api/customers',
-    )
+    const response = await apiFetch(
+  '/api/customers',
+)
 
     if (!response.ok) {
       throw new Error(

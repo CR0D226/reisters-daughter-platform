@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { apiFetch } from '@/services/api'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 interface EventRecord {
@@ -89,6 +90,134 @@ const location = ref(
 
 const isPublic = ref(false)
 const capacity = ref<number | null>(null)
+
+// EVENT COVER IMAGE EDITOR V1
+const selectedCoverImage = ref<File | null>(null)
+const coverPreviewUrl = ref<string | null>(null)
+const coverImageSaving = ref(false)
+const removeExistingCover = ref(false)
+
+// EVENT SAVED IMAGE PREVIEW V1
+const savedCoverUrl = ref<string | null>(null)
+const hasSavedCover = ref(false)
+
+function clearSavedCoverPreview() {
+  if (savedCoverUrl.value) {
+    URL.revokeObjectURL(savedCoverUrl.value)
+    savedCoverUrl.value = null
+  }
+}
+
+async function loadSavedCover(id: number) {
+  clearSavedCoverPreview()
+  hasSavedCover.value = false
+
+  const response = await apiFetch(
+    `/api/events/${id}/cover-image`,
+  )
+
+  if (response.status === 404) return
+
+  if (!response.ok) {
+    throw new Error('Unable to load event cover image.')
+  }
+
+  const blob = await response.blob()
+  savedCoverUrl.value = URL.createObjectURL(blob)
+  hasSavedCover.value = true
+}
+
+function removeCoverImage() {
+  clearSelectedCover()
+  removeExistingCover.value = true
+}
+
+function undoCoverRemoval() {
+  removeExistingCover.value = false
+}
+
+const coverFileInput = ref<HTMLInputElement | null>(null)
+
+function selectCoverImage(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+
+  if (!file) return
+
+  if (
+    !['image/jpeg', 'image/png', 'image/webp'].includes(file.type) ||
+    file.size > 5 * 1024 * 1024 ||
+    file.size === 0
+  ) {
+    errorMessage.value = 'Choose a JPG, PNG, or WebP image under 5 MB.'
+    input.value = ''
+    return
+  }
+
+  if (coverPreviewUrl.value) {
+    URL.revokeObjectURL(coverPreviewUrl.value)
+  }
+
+  selectedCoverImage.value = file
+  coverPreviewUrl.value = URL.createObjectURL(file)
+  removeExistingCover.value = false
+  errorMessage.value = ''
+}
+
+function clearSelectedCover() {
+  selectedCoverImage.value = null
+
+  if (coverPreviewUrl.value) {
+    URL.revokeObjectURL(coverPreviewUrl.value)
+    coverPreviewUrl.value = null
+  }
+
+  if (coverFileInput.value) {
+    coverFileInput.value.value = ''
+  }
+}
+
+async function saveCoverImage(id: number) {
+  if (!selectedCoverImage.value && !removeExistingCover.value) return
+
+  coverImageSaving.value = true
+
+  try {
+    if (selectedCoverImage.value) {
+      const form = new FormData()
+      form.append('image', selectedCoverImage.value)
+
+      const response = await apiFetch(
+        `/api/events/${id}/cover-image`,
+        { method: 'POST', body: form },
+      )
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.message || 'Unable to upload cover image.')
+      }
+
+      clearSelectedCover()
+      await loadSavedCover(id)
+    } else if (removeExistingCover.value) {
+      const response = await apiFetch(
+        `/api/events/${id}/cover-image`,
+        { method: 'DELETE' },
+      )
+
+      if (!response.ok) {
+        throw new Error('Unable to remove cover image.')
+      }
+
+      removeExistingCover.value = false
+      hasSavedCover.value = false
+      clearSavedCoverPreview()
+    }
+  } finally {
+    coverImageSaving.value = false
+  }
+}
+
 
 const eventTypes = [
   'High Tea',
@@ -251,8 +380,8 @@ async function loadReservations() {
   reservationsLoading.value = true
 
   try {
-    const response = await fetch(
-      `http://localhost:5128/api/events/${eventId.value}/reservations`,
+    const response = await apiFetch(
+      `/api/events/${eventId.value}/reservations`,
     )
 
     const data = await response.json()
@@ -291,8 +420,8 @@ async function updateReservationStatus(
     reservationId
 
   try {
-    const response = await fetch(
-      `http://localhost:5128/api/events/${eventId.value}/reservations/${reservationId}/status`,
+    const response = await apiFetch(
+      `/api/events/${eventId.value}/reservations/${reservationId}/status`,
       {
         method: 'PUT',
 
@@ -353,8 +482,8 @@ async function deleteReservation(
     reservationId
 
   try {
-    const response = await fetch(
-      `http://localhost:5128/api/events/${eventId.value}/reservations/${reservationId}`,
+    const response = await apiFetch(
+      `/api/events/${eventId.value}/reservations/${reservationId}`,
       {
         method: 'DELETE',
       },
@@ -401,8 +530,8 @@ async function loadEvent() {
   clearMessages()
 
   try {
-    const response = await fetch(
-      `http://localhost:5128/api/events/${eventId.value}`,
+    const response = await apiFetch(
+      `/api/events/${eventId.value}`,
     )
 
     if (!response.ok) {
@@ -415,6 +544,12 @@ async function loadEvent() {
       await response.json()
 
     populateForm(eventRecord)
+
+    try {
+      await loadSavedCover(eventRecord.id)
+    } catch (imageError) {
+      console.error('Unable to load cover image:', imageError)
+    }
 
     await loadReservations()
   } catch (error) {
@@ -440,10 +575,10 @@ async function saveEvent() {
 
   try {
     const url = isNew.value
-      ? 'http://localhost:5128/api/events'
-      : `http://localhost:5128/api/events/${eventId.value}`
+      ? '/api/events'
+      : `/api/events/${eventId.value}`
 
-    const response = await fetch(url, {
+    const response = await apiFetch(url, {
       method: isNew.value
         ? 'POST'
         : 'PUT',
@@ -466,6 +601,8 @@ async function saveEvent() {
           'Unable to save event.',
       )
     }
+
+    await saveCoverImage(data.id)
 
     if (isNew.value) {
       await router.replace(
@@ -504,8 +641,8 @@ async function updateStatus(
   statusUpdating.value = true
 
   try {
-    const response = await fetch(
-      `http://localhost:5128/api/events/${eventId.value}/status`,
+    const response = await apiFetch(
+      `/api/events/${eventId.value}/status`,
       {
         method: 'PUT',
 
@@ -550,6 +687,11 @@ function backToEvents() {
 }
 
 onMounted(loadEvent)
+
+onUnmounted(() => {
+  clearSelectedCover()
+  clearSavedCoverPreview()
+})
 </script>
 
 <template>
@@ -682,6 +824,74 @@ onMounted(loadEvent)
                   />
                 </label>
               </div>
+            </section>
+
+            <!-- EVENT COVER IMAGE EDITOR V1 -->
+            <section class="editor-card">
+              <div class="card-heading">
+                <div>
+                  <p class="card-eyebrow">Media</p>
+                  <h2>Event Cover Image</h2>
+                </div>
+              </div>
+
+              <p class="page-description">
+                Optional. Recommended size: 1600 × 900 pixels.
+                JPG, PNG or WebP, maximum 5 MB.
+              </p>
+
+              <label class="field">
+                <span>Select an image</span>
+                <input
+                  ref="coverFileInput"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  @change="selectCoverImage"
+                />
+              </label>
+
+              <div v-if="coverPreviewUrl" style="margin-top: 16px">
+                <img
+                  :src="coverPreviewUrl"
+                  alt="Selected event cover preview"
+                  style="width: 100%; max-height: 320px; object-fit: cover; border-radius: 12px"
+                />
+                <button
+                  type="button"
+                  class="secondary-small-button"
+                  style="margin-top: 12px"
+                  @click="clearSelectedCover"
+                >
+                  Clear Selection
+                </button>
+              </div>
+
+              <div
+                v-if="savedCoverUrl && !coverPreviewUrl"
+                style="margin-top: 16px"
+              >
+                <img
+                  v-if="!removeExistingCover"
+                  :src="savedCoverUrl"
+                  alt="Current event cover image"
+                  style="width: 100%; max-height: 320px; object-fit: cover; border-radius: 12px"
+                />
+
+                <p v-if="removeExistingCover">
+                  This image will be removed when you save.
+                </p>
+
+                <button
+                  type="button"
+                  class="secondary-small-button"
+                  style="margin-top: 12px"
+                  @click="removeExistingCover ? undoCoverRemoval() : removeCoverImage()"
+                >
+                  {{ removeExistingCover ? 'Undo Removal' : 'Remove Image' }}
+                </button>
+              </div>
+
+              <p v-if="coverImageSaving">Uploading cover image...</p>
             </section>
 
             <section class="editor-card">

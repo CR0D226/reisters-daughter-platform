@@ -17,3 +17,41 @@
 
 # Node
 **/node_modules/
+
+# Railway deployment preparation
+
+# Local backups
+*.bak
+*.backup
+backups/
+branding-backup-*/
+
+# Local databases
+*.db
+*.db-shm
+*.db-wal
+
+# Secrets and environment overrides
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Build output
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+
+# Local certificates and private keys
+*.p12
+*.pfx
+*.pem
+*.key
+web/certs/
+
+# macOS
+.DS_Store
+
+# Editor backup files
+*.save

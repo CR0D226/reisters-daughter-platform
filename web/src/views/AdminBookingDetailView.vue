@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { apiFetch } from '@/services/api'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
@@ -158,8 +159,8 @@ async function loadBooking() {
   error.value = ''
 
   try {
-    const response = await fetch(
-      `http://localhost:5128/api/bookings/${bookingId.value}`,
+    const response = await apiFetch(
+      `/api/bookings/${bookingId.value}`,
     )
 
     if (!response.ok) {
@@ -193,8 +194,8 @@ async function updateStatus(status: string) {
   statusMessage.value = ''
 
   try {
-    const response = await fetch(
-      `http://localhost:5128/api/bookings/${booking.value.id}/status`,
+    const response = await apiFetch(
+      `/api/bookings/${booking.value.id}/status`,
       {
         method: 'PATCH',
         headers: {
@@ -235,8 +236,8 @@ async function saveInternalNotes() {
   notesMessage.value = ''
 
   try {
-    const response = await fetch(
-      `http://localhost:5128/api/bookings/${booking.value.id}/notes`,
+    const response = await apiFetch(
+      `/api/bookings/${booking.value.id}/notes`,
       {
         method: 'PATCH',
         headers: {

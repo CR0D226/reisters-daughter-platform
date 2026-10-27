@@ -29,7 +29,7 @@
   padding: 14px 20px;
   border-radius: 999px;
 
-  background: #1c1c1c;
+  background: #C85F83;
   color: #ffffff;
 
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);

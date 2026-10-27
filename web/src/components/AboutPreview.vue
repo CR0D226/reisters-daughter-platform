@@ -37,7 +37,7 @@
   grid-template-columns: 1fr 2fr;
   gap: 60px;
   padding: 120px 6%;
-  background: #f7f4ee;
+  background: #F6D5DF;
 }
 
 .about-label p {
@@ -70,7 +70,7 @@ h2 {
 .about-content .intro {
   margin-top: 40px;
   font-size: 1.15rem;
-  color: #1c1c1c;
+  color: #392D2A;
 }
 
 .about-link {

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { apiFetch } from '@/services/api'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -145,8 +146,8 @@ async function loadBookings() {
   error.value = ''
 
   try {
-    const response = await fetch(
-      'http://localhost:5128/api/bookings',
+    const response = await apiFetch(
+      '/api/bookings',
     )
 
     if (!response.ok) {

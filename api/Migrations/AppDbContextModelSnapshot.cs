@@ -72,6 +72,104 @@ namespace ReistersDaughter.Api.Migrations
                     b.ToTable("AppUsers");
                 });
 
+            modelBuilder.Entity("ReistersDaughter.Api.Models.AvailabilityEntry", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AppUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("AvailabilityPeriodId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<TimeOnly>("EndTime")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<TimeOnly>("StartTime")
+                        .HasColumnType("time without time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppUserId");
+
+                    b.HasIndex("AvailabilityPeriodId", "AppUserId", "Date", "StartTime")
+                        .IsUnique();
+
+                    b.ToTable("AvailabilityEntries", t =>
+                        {
+                            t.HasCheckConstraint("CK_AvailabilityEntry_TimeRange", "\"EndTime\" > \"StartTime\"");
+                        });
+                });
+
+            modelBuilder.Entity("ReistersDaughter.Api.Models.AvailabilityPeriod", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("Deadline")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly>("EndDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StartDate")
+                        .IsUnique();
+
+                    b.ToTable("AvailabilityPeriods", t =>
+                        {
+                            t.HasCheckConstraint("CK_AvailabilityPeriod_Dates", "\"EndDate\" = \"StartDate\" + 13");
+                        });
+                });
+
+            modelBuilder.Entity("ReistersDaughter.Api.Models.AvailabilitySubmission", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AppUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("AvailabilityPeriodId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppUserId");
+
+                    b.HasIndex("AvailabilityPeriodId", "AppUserId")
+                        .IsUnique();
+
+                    b.ToTable("AvailabilitySubmissions");
+                });
+
             modelBuilder.Entity("ReistersDaughter.Api.Models.Booking", b =>
                 {
                     b.Property<int>("Id")
@@ -225,6 +323,67 @@ namespace ReistersDaughter.Api.Migrations
                     b.ToTable("Customers");
                 });
 
+            modelBuilder.Entity("ReistersDaughter.Api.Models.EmployeeAvailability", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AppUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("DayOfWeek")
+                        .HasColumnType("integer");
+
+                    b.Property<TimeOnly>("EndTime")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<TimeOnly>("StartTime")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppUserId", "DayOfWeek", "StartTime")
+                        .IsUnique();
+
+                    b.ToTable("EmployeeAvailabilities", t =>
+                        {
+                            t.HasCheckConstraint("CK_EmployeeAvailability_TimeRange", "\"EndTime\" > \"StartTime\"");
+                        });
+                });
+
+            modelBuilder.Entity("ReistersDaughter.Api.Models.EmployeePosition", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AppUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Position")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppUserId", "Position")
+                        .IsUnique();
+
+                    b.ToTable("EmployeePositions");
+                });
+
             modelBuilder.Entity("ReistersDaughter.Api.Models.Event", b =>
                 {
                     b.Property<int>("Id")
@@ -238,6 +397,9 @@ namespace ReistersDaughter.Api.Migrations
 
                     b.Property<int?>("Capacity")
                         .HasColumnType("integer");
+
+                    b.Property<string>("CoverImagePath")
+                        .HasColumnType("text");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -491,6 +653,151 @@ namespace ReistersDaughter.Api.Migrations
                     b.ToTable("InquiryNotes");
                 });
 
+            modelBuilder.Entity("ReistersDaughter.Api.Models.JobApplication", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("AvailableEarlyMornings")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateOnly?>("AvailableStartDate")
+                        .HasColumnType("date");
+
+                    b.Property<bool>("AvailableWeekends")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DesiredWeeklyHours")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)");
+
+                    b.Property<string>("Experience")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<bool?>("HasFoodSafetyCertification")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool?>("HasReliableTransportation")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Introduction")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("LastName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("Position")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("ResumeOriginalFileName")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("ResumeStorageKey")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("Position");
+
+                    b.HasIndex("Status");
+
+                    b.ToTable("JobApplications");
+                });
+
+            modelBuilder.Entity("ReistersDaughter.Api.Models.JobApplicationActivity", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<int>("JobApplicationId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("JobApplicationId");
+
+                    b.ToTable("JobApplicationActivities");
+                });
+
+            modelBuilder.Entity("ReistersDaughter.Api.Models.JobApplicationNote", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(5000)
+                        .HasColumnType("character varying(5000)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("JobApplicationId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("JobApplicationId");
+
+                    b.ToTable("JobApplicationNotes");
+                });
+
             modelBuilder.Entity("ReistersDaughter.Api.Models.Quote", b =>
                 {
                     b.Property<int>("Id")
@@ -579,6 +886,195 @@ namespace ReistersDaughter.Api.Migrations
                     b.ToTable("QuoteItems");
                 });
 
+            modelBuilder.Entity("ReistersDaughter.Api.Models.ShiftAssignment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AppUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("WorkShiftId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppUserId");
+
+                    b.HasIndex("WorkShiftId", "AppUserId")
+                        .IsUnique();
+
+                    b.ToTable("ShiftAssignments");
+                });
+
+            modelBuilder.Entity("ReistersDaughter.Api.Models.TimeOffRequest", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AppUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly>("EndDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("ManagerNote")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("ReviewedByAppUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReviewedByAppUserId");
+
+                    b.HasIndex("AppUserId", "StartDate", "EndDate");
+
+                    b.ToTable("TimeOffRequests", t =>
+                        {
+                            t.HasCheckConstraint("CK_TimeOffRequest_Dates", "\"EndDate\" >= \"StartDate\"");
+                        });
+                });
+
+            modelBuilder.Entity("ReistersDaughter.Api.Models.WorkSchedule", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly>("EndDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTimeOffset?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StartDate")
+                        .IsUnique();
+
+                    b.ToTable("WorkSchedules", t =>
+                        {
+                            t.HasCheckConstraint("CK_WorkSchedule_Dates", "\"EndDate\" = \"StartDate\" + 13");
+                        });
+                });
+
+            modelBuilder.Entity("ReistersDaughter.Api.Models.WorkShift", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<TimeOnly>("EndTime")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<string>("Position")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("RequiredEmployees")
+                        .HasColumnType("integer");
+
+                    b.Property<TimeOnly>("StartTime")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<int>("WorkScheduleId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkScheduleId", "Date");
+
+                    b.ToTable("WorkShifts", t =>
+                        {
+                            t.HasCheckConstraint("CK_WorkShift_RequiredEmployees", "\"RequiredEmployees\" > 0");
+
+                            t.HasCheckConstraint("CK_WorkShift_TimeRange", "\"EndTime\" > \"StartTime\"");
+                        });
+                });
+
+            modelBuilder.Entity("ReistersDaughter.Api.Models.AvailabilityEntry", b =>
+                {
+                    b.HasOne("ReistersDaughter.Api.Models.AppUser", "AppUser")
+                        .WithMany()
+                        .HasForeignKey("AppUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ReistersDaughter.Api.Models.AvailabilityPeriod", "AvailabilityPeriod")
+                        .WithMany()
+                        .HasForeignKey("AvailabilityPeriodId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AppUser");
+
+                    b.Navigation("AvailabilityPeriod");
+                });
+
+            modelBuilder.Entity("ReistersDaughter.Api.Models.AvailabilitySubmission", b =>
+                {
+                    b.HasOne("ReistersDaughter.Api.Models.AppUser", "AppUser")
+                        .WithMany()
+                        .HasForeignKey("AppUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ReistersDaughter.Api.Models.AvailabilityPeriod", "AvailabilityPeriod")
+                        .WithMany()
+                        .HasForeignKey("AvailabilityPeriodId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AppUser");
+
+                    b.Navigation("AvailabilityPeriod");
+                });
+
             modelBuilder.Entity("ReistersDaughter.Api.Models.Booking", b =>
                 {
                     b.HasOne("ReistersDaughter.Api.Models.Customer", "Customer")
@@ -619,6 +1115,28 @@ namespace ReistersDaughter.Api.Migrations
                     b.Navigation("Customer");
 
                     b.Navigation("Inquiry");
+                });
+
+            modelBuilder.Entity("ReistersDaughter.Api.Models.EmployeeAvailability", b =>
+                {
+                    b.HasOne("ReistersDaughter.Api.Models.AppUser", "AppUser")
+                        .WithMany()
+                        .HasForeignKey("AppUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AppUser");
+                });
+
+            modelBuilder.Entity("ReistersDaughter.Api.Models.EmployeePosition", b =>
+                {
+                    b.HasOne("ReistersDaughter.Api.Models.AppUser", "AppUser")
+                        .WithMany("Positions")
+                        .HasForeignKey("AppUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AppUser");
                 });
 
             modelBuilder.Entity("ReistersDaughter.Api.Models.Event", b =>
@@ -680,6 +1198,28 @@ namespace ReistersDaughter.Api.Migrations
                     b.Navigation("Inquiry");
                 });
 
+            modelBuilder.Entity("ReistersDaughter.Api.Models.JobApplicationActivity", b =>
+                {
+                    b.HasOne("ReistersDaughter.Api.Models.JobApplication", "JobApplication")
+                        .WithMany("Activities")
+                        .HasForeignKey("JobApplicationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("JobApplication");
+                });
+
+            modelBuilder.Entity("ReistersDaughter.Api.Models.JobApplicationNote", b =>
+                {
+                    b.HasOne("ReistersDaughter.Api.Models.JobApplication", "JobApplication")
+                        .WithMany("Notes")
+                        .HasForeignKey("JobApplicationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("JobApplication");
+                });
+
             modelBuilder.Entity("ReistersDaughter.Api.Models.Quote", b =>
                 {
                     b.HasOne("ReistersDaughter.Api.Models.Inquiry", "Inquiry")
@@ -702,6 +1242,59 @@ namespace ReistersDaughter.Api.Migrations
                     b.Navigation("Quote");
                 });
 
+            modelBuilder.Entity("ReistersDaughter.Api.Models.ShiftAssignment", b =>
+                {
+                    b.HasOne("ReistersDaughter.Api.Models.AppUser", "AppUser")
+                        .WithMany()
+                        .HasForeignKey("AppUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ReistersDaughter.Api.Models.WorkShift", "WorkShift")
+                        .WithMany()
+                        .HasForeignKey("WorkShiftId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AppUser");
+
+                    b.Navigation("WorkShift");
+                });
+
+            modelBuilder.Entity("ReistersDaughter.Api.Models.TimeOffRequest", b =>
+                {
+                    b.HasOne("ReistersDaughter.Api.Models.AppUser", "AppUser")
+                        .WithMany()
+                        .HasForeignKey("AppUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ReistersDaughter.Api.Models.AppUser", "ReviewedBy")
+                        .WithMany()
+                        .HasForeignKey("ReviewedByAppUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("AppUser");
+
+                    b.Navigation("ReviewedBy");
+                });
+
+            modelBuilder.Entity("ReistersDaughter.Api.Models.WorkShift", b =>
+                {
+                    b.HasOne("ReistersDaughter.Api.Models.WorkSchedule", "WorkSchedule")
+                        .WithMany()
+                        .HasForeignKey("WorkScheduleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("WorkSchedule");
+                });
+
+            modelBuilder.Entity("ReistersDaughter.Api.Models.AppUser", b =>
+                {
+                    b.Navigation("Positions");
+                });
+
             modelBuilder.Entity("ReistersDaughter.Api.Models.Customer", b =>
                 {
                     b.Navigation("Inquiries");
@@ -714,6 +1307,13 @@ namespace ReistersDaughter.Api.Migrations
                     b.Navigation("Notes");
 
                     b.Navigation("Quotes");
+                });
+
+            modelBuilder.Entity("ReistersDaughter.Api.Models.JobApplication", b =>
+                {
+                    b.Navigation("Activities");
+
+                    b.Navigation("Notes");
                 });
 
             modelBuilder.Entity("ReistersDaughter.Api.Models.Quote", b =>

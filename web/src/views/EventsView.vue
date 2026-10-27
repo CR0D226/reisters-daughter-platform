@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { API_BASE } from '../config/api'
 import {
   computed,
   onMounted,
@@ -16,6 +17,7 @@ interface PublicEvent {
   endTime: string | null
   location: string | null
   capacity: number | null
+  coverImagePath: string | null
 }
 
 const events = ref<PublicEvent[]>([])
@@ -40,7 +42,7 @@ async function loadEvents() {
 
   try {
     const response = await fetch(
-      'http://localhost:5128/api/public/events',
+      `${API_BASE}/api/public/events`,
     )
 
     if (!response.ok) {
@@ -256,27 +258,27 @@ onMounted(loadEvents)
           v-for="event in upcomingEvents"
           :key="event.id"
           class="event-card"
+          :class="{ 'event-card-no-image': !event.coverImagePath }"
         >
-          <div class="event-date">
-            <span class="event-month">
-              {{
-                formatMonth(
-                  event.startDate,
-                )
-              }}
-            </span>
-
-            <span class="event-day">
-              {{
-                formatDay(
-                  event.startDate,
-                )
-              }}
-            </span>
+          <!-- PUBLIC EVENT COVER DISPLAY V1 -->
+          <div
+            v-if="event.coverImagePath"
+            class="event-cover"
+          >
+            <img
+              :src="`${API_BASE}/api/public/events/${event.id}/cover-image`"
+              :alt="`${event.title} cover image`"
+              loading="lazy"
+            />
           </div>
 
-
           <div class="event-content">
+            <!-- EVENT CARD LAYOUT V2 -->
+            <div class="event-date-inline">
+              <span>{{ formatMonth(event.startDate) }}</span>
+              <strong>{{ formatDay(event.startDate) }}</strong>
+            </div>
+
             <p class="event-type">
               {{ event.type }}
             </p>
@@ -386,11 +388,12 @@ onMounted(loadEvents)
 
 <style scoped>
 .events-page {
-  background: #f7f4ee;
+  background: #FFF8F1;
   color: #2f2a26;
 }
 
 .events-hero {
+  background: #F6D5DF;
   padding: 110px 5% 100px;
   border-bottom:
     1px solid rgba(47, 42, 38, 0.12);
@@ -402,7 +405,7 @@ onMounted(loadEvents)
 
 .eyebrow {
   margin: 0 0 18px;
-  color: #7b6755;
+  color: #A34366;
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.16em;
@@ -482,11 +485,11 @@ onMounted(loadEvents)
   justify-content: center;
   border-right:
     1px solid rgba(47, 42, 38, 0.12);
-  background: #eee8de;
+  background: #F6D5DF;
 }
 
 .event-month {
-  color: #7b6755;
+  color: #A34366;
   font-size: 0.8rem;
   font-weight: 800;
   letter-spacing: 0.16em;
@@ -506,7 +509,7 @@ onMounted(loadEvents)
 
 .event-type {
   margin: 0 0 8px;
-  color: #8b725c;
+  color: #A34366;
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -557,7 +560,7 @@ onMounted(loadEvents)
 }
 
 .event-link {
-  color: #8b725c;
+  color: #C85F83;
   font-size: 0.82rem;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -595,8 +598,8 @@ onMounted(loadEvents)
 
 .private-events {
   padding: 100px 5%;
-  background: #302a25;
-  color: #ffffff;
+  background: #F6D5DF;
+  color: #1C1C1C;
 }
 
 .private-inner {
@@ -606,11 +609,11 @@ onMounted(loadEvents)
 }
 
 .private-inner .eyebrow {
-  color: #c7b29f;
+  color: #A34366;
 }
 
 .private-inner > p {
-  color: rgba(255, 255, 255, 0.72);
+  color: #625c52;
 }
 
 .inquiry-button {
@@ -618,8 +621,8 @@ onMounted(loadEvents)
   margin-top: 20px;
   padding: 15px 24px;
   border-radius: 999px;
-  background: #ffffff;
-  color: #302a25;
+  background: #C85F83;
+  color: #ffffff;
   font-weight: 700;
 }
 
@@ -677,6 +680,95 @@ onMounted(loadEvents)
 
   .private-events {
     padding: 75px 20px;
+  }
+}
+</style>
+
+
+<style scoped>
+/* EVENT CARD LAYOUT V2 */
+
+.event-card {
+  display: grid;
+  grid-template-columns: minmax(0, 43%) minmax(0, 57%);
+  min-height: 330px;
+  align-items: stretch;
+}
+
+.event-card-no-image {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.event-cover {
+  position: relative;
+  min-width: 0;
+  min-height: 330px;
+  overflow: hidden;
+}
+
+.event-cover img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.event-content {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  padding: 38px 44px;
+}
+
+.event-date-inline {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  margin-bottom: 18px;
+  color: #A34366;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.event-date-inline strong {
+  font-size: 1.2rem;
+  letter-spacing: -0.03em;
+}
+
+.event-content h3 {
+  overflow-wrap: anywhere;
+  font-size: clamp(1.9rem, 3vw, 2.8rem);
+}
+
+.event-footer {
+  margin-top: 26px;
+}
+
+@media (max-width: 700px) {
+  .event-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .event-cover {
+    min-height: 240px;
+  }
+
+  .event-content {
+    padding: 28px 24px;
+  }
+
+  .event-date-inline {
+    margin-bottom: 12px;
+  }
+
+  .event-content h3 {
+    font-size: 2rem;
   }
 }
 </style>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { apiFetch } from '@/services/api'
 import { computed, ref } from 'vue'
 
 interface QuoteItemForm {
@@ -157,8 +158,8 @@ async function saveQuote() {
   saving.value = true
 
   try {
-    const response = await fetch(
-      `http://localhost:5128/api/inquiries/${props.inquiryId}/quotes`,
+    const response = await apiFetch(
+      `/api/inquiries/${props.inquiryId}/quotes`,
       {
         method: 'POST',
 

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { apiFetch } from '@/services/api'
 import {
   computed,
   onBeforeUnmount,
@@ -10,6 +11,8 @@ import {
   RouterLink,
   RouterView,
 } from 'vue-router'
+
+import keycloak from '@/auth/keycloak'
 
 interface PendingReservation {
   reservationId: number
@@ -52,8 +55,8 @@ async function loadAttention() {
   attentionLoading.value = true
 
   try {
-    const response = await fetch(
-      'http://localhost:5128/api/admin/dashboard',
+    const response = await apiFetch(
+      '/api/admin/dashboard',
     )
 
     if (!response.ok) {
@@ -111,6 +114,12 @@ function handleDocumentClick(
   }
 }
 
+async function logout() {
+  await keycloak.logout({
+    redirectUri: window.location.origin,
+  })
+}
+
 onMounted(() => {
   loadAttention()
 
@@ -130,8 +139,39 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="admin-layout">
-    <header class="admin-header">
-      <div class="admin-header-inner">
+    <aside class="admin-sidebar">
+      <div class="sidebar-brand">
+        <RouterLink to="/admin" class="sidebar-brand-link">
+          <span class="sidebar-logo">RD</span>
+          <span class="sidebar-brand-text">
+            <strong>The Reister's Daughter</strong>
+            <small>MANAGEMENT</small>
+          </span>
+        </RouterLink>
+      </div>
+
+      <nav class="sidebar-nav" aria-label="Admin navigation">
+        <RouterLink
+  to="/admin"
+  active-class=""
+  exact-active-class="active"
+>
+  Dashboard
+</RouterLink>
+        <RouterLink to="/admin/inquiries">Inquiries</RouterLink>
+        <RouterLink to="/admin/applicants">Applicants</RouterLink>
+        <RouterLink to="/admin/customers">Customers</RouterLink>
+        <RouterLink to="/admin/bookings">Bookings</RouterLink>
+        <RouterLink to="/admin/events">Events</RouterLink>
+        <RouterLink to="/admin/users">Users</RouterLink>
+        <RouterLink to="/admin/availability">Staff Availability</RouterLink>
+        <RouterLink to="/admin/schedule">Schedule Builder</RouterLink>
+      </nav>
+    </aside>
+
+    <div class="admin-workspace">
+      <header class="admin-header">
+        <div class="admin-header-inner">
         <div class="admin-brand">
           <RouterLink to="/admin" class="admin-brand-link">
             <span class="admin-brand-name">
@@ -144,50 +184,7 @@ onBeforeUnmount(() => {
           </RouterLink>
         </div>
 
-        <nav class="admin-nav">
-          <RouterLink
-            to="/admin"
-            class="admin-nav-link"
-            exact-active-class="active"
-          >
-            Dashboard
-          </RouterLink>
 
-          <RouterLink
-            to="/admin/inquiries"
-            class="admin-nav-link"
-          >
-            Inquiries
-          </RouterLink>
-
-          <RouterLink
-            to="/admin/customers"
-            class="admin-nav-link"
-          >
-            Customers
-          </RouterLink>
-
-          <RouterLink
-            to="/admin/bookings"
-            class="admin-nav-link"
-          >
-            Bookings
-          </RouterLink>
-
-          <RouterLink
-            to="/admin/events"
-            class="admin-nav-link"
-          >
-            Events
-          </RouterLink>
-
-          <RouterLink
-  to="/admin/users"
-  class="admin-nav-link"
->
-  Users
-</RouterLink>
-        </nav>
 
         <div class="admin-actions">
           <!-- Attention notification goes here next -->
@@ -341,13 +338,21 @@ onBeforeUnmount(() => {
           >
             View Site
           </RouterLink>
+          <button
+  type="button"
+  class="logout-button"
+  @click="logout"
+>
+  Logout
+</button>
         </div>
       </div>
-    </header>
+          </header>
 
-    <main class="admin-content">
-      <RouterView />
-    </main>
+      <main class="admin-content">
+        <RouterView />
+      </main>
+    </div>
   </div>
 </template>
 
@@ -485,6 +490,25 @@ onBeforeUnmount(() => {
 }
 
 .view-site-link:hover {
+  background: #f7f4ef;
+}
+.logout-button {
+  padding: 0.6rem 0.9rem;
+
+  border: 1px solid #d8d0c7;
+  border-radius: 0.5rem;
+
+  background: #ffffff;
+  color: #4f4943;
+
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+
+  cursor: pointer;
+}
+
+.logout-button:hover {
   background: #f7f4ef;
 }
 
@@ -675,11 +699,171 @@ onBeforeUnmount(() => {
     width: 100%;
 
     overflow-x: auto;
-    
+
   }
 
   .admin-actions {
     margin-left: auto;
   }
 }
+
+/* Reister's Daughter admin sidebar */
+
+.admin-layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  min-height: 100vh;
+  background: #faf7f9;
+}
+
+.admin-sidebar {
+  min-width: 0;
+  background: #30252d;
+  color: white;
+  padding: 24px 14px;
+}
+
+.sidebar-brand {
+  padding: 4px 10px 30px;
+}
+
+.sidebar-brand-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: white;
+  text-decoration: none;
+}
+
+.sidebar-logo {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  background: #deb4c8;
+  border-radius: 12px;
+  color: #30252d;
+  font-weight: 800;
+}
+
+.sidebar-brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.sidebar-brand-text strong {
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.sidebar-brand-text small {
+  color: #deb4c8;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.sidebar-nav a {
+  display: block;
+  padding: 12px 14px;
+  border-radius: 10px;
+  color: #e5dce2;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.15s ease;
+}
+
+.sidebar-nav a:hover {
+  background: #493744;
+  color: white;
+}
+
+.sidebar-nav a.router-link-exact-active,
+.sidebar-nav a.active {
+  background: #80536d;
+  color: white;
+}
+
+.admin-workspace {
+  min-width: 0;
+}
+
+.admin-header {
+  position: relative;
+  top: auto;
+  background: white;
+  border-bottom: 1px solid #e9dfe5;
+}
+
+.admin-header-inner {
+  width: 100%;
+  min-height: 68px;
+  margin: 0;
+  padding: 12px 24px;
+  justify-content: flex-end;
+}
+
+.admin-brand,
+.admin-nav {
+  display: none;
+}
+
+.admin-actions {
+  margin-left: auto;
+}
+
+.admin-content {
+  min-width: 0;
+  min-height: calc(100vh - 68px);
+}
+
+@media (max-width: 900px) {
+  .admin-layout {
+    grid-template-columns: 190px minmax(0, 1fr);
+  }
+
+  .admin-header-inner {
+    width: 100%;
+    flex-wrap: nowrap;
+  }
+}
+
+@media (max-width: 650px) {
+  .admin-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-sidebar {
+    padding: 14px;
+  }
+
+  .sidebar-brand {
+    padding-bottom: 14px;
+  }
+
+  .sidebar-nav {
+    flex-direction: row;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .sidebar-nav a {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  .admin-header-inner {
+    width: 100%;
+    padding: 12px 14px;
+  }
+}
+
 </style>

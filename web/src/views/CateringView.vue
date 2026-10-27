@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { API_BASE } from '../config/api'
 import { computed, ref } from 'vue'
 
 // --------------------------------------------------
@@ -109,7 +110,7 @@ async function submitInquiry() {
 
   try {
     const response = await fetch(
-      'http://localhost:5128/api/inquiries',
+      `${API_BASE}/api/inquiries`,
       {
         method: 'POST',
 
@@ -977,7 +978,7 @@ async function submitInquiry() {
 
 <style scoped>
 .catering-page {
-  background: #f7f4ee;
+  background: #FFF8F1;
   color: #1d1d1b;
 }
 
@@ -1012,7 +1013,7 @@ async function submitInquiry() {
 }
 
 .catering-hero .eyebrow {
-  color: #e5c9a5;
+  color: #F6D5DF;
 }
 
 .catering-hero h1 {
@@ -1035,8 +1036,8 @@ async function submitInquiry() {
   display: inline-flex;
   padding: 15px 23px;
   border-radius: 999px;
-  background: #f4eee3;
-  color: #1d1d1b;
+  background: #C85F83;
+  color: white;
   font-weight: 700;
 }
 
@@ -1109,12 +1110,12 @@ async function submitInquiry() {
 
 .options-section {
   padding: 100px max(24px, calc((100% - 1180px) / 2));
-  background: #22221f;
-  color: white;
+  background: #F6D5DF;
+  color: #1d1d1b;
 }
 
 .section-heading.light p {
-  color: #c5c0b7;
+  color: #625c52;
 }
 
 .option-grid {
@@ -1126,9 +1127,9 @@ async function submitInquiry() {
 .option-card {
   min-height: 300px;
   padding: 32px;
-  border: 1px solid #4a4944;
+  border: 1px solid #E8B9C8;
   border-radius: 16px;
-  background: #2b2b27;
+  background: #FFF8F1;
 }
 
 .option-number {
@@ -1136,7 +1137,7 @@ async function submitInquiry() {
   margin-bottom: 80px;
   font-size: 0.75rem;
   letter-spacing: 0.14em;
-  color: #a9a59d;
+  color: #A34366;
 }
 
 .option-card h3 {
@@ -1147,7 +1148,7 @@ async function submitInquiry() {
 .option-card p {
   margin: 0;
   line-height: 1.65;
-  color: #c7c4bd;
+  color: #625c52;
 }
 
 
@@ -1168,7 +1169,7 @@ async function submitInquiry() {
 .inquiry-form {
   padding: 40px;
   border-radius: 18px;
-  background: white;
+  background: #FFFFFF;
   box-shadow:
     0 12px 40px rgba(0, 0, 0, 0.06);
 }
@@ -1234,8 +1235,8 @@ legend {
 }
 
 .choice-card input:checked + span {
-  border-color: #24241f;
-  background: #24241f;
+  border-color: #C85F83;
+  background: #C85F83;
   color: white;
 }
 
@@ -1298,7 +1299,7 @@ textarea {
 input:focus,
 select:focus,
 textarea:focus {
-  outline: 2px solid #24241f;
+  outline: 2px solid #C85F83;
   outline-offset: 2px;
 }
 
@@ -1308,7 +1309,7 @@ textarea:focus {
 .conditional-section {
   padding: 28px;
   border-radius: 14px;
-  background: #f4f0e8;
+  background: #FFF8F1;
 }
 
 .dietary-section {
@@ -1348,8 +1349,8 @@ textarea:focus {
 .rental-notice {
   margin: 0 0 40px;
   padding: 22px;
-  border-left: 4px solid #252520;
-  background: #efebe3;
+  border-left: 4px solid #C85F83;
+  background: #FFF1F5;
 }
 
 .rental-notice p {
@@ -1388,7 +1389,7 @@ textarea:focus {
   min-height: 54px;
   border: 0;
   border-radius: 999px;
-  background: #22221f;
+  background: #C85F83;
   color: white;
   font-size: 1rem;
   font-weight: 700;

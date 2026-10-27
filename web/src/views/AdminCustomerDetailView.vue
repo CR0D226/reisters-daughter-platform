@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { apiFetch } from '@/services/api'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -180,8 +181,8 @@ async function loadCustomer() {
   error.value = ''
 
   try {
-    const response = await fetch(
-      `http://localhost:5128/api/customers/${customerId.value}`,
+    const response = await apiFetch(
+      `/api/customers/${customerId.value}`,
     )
 
     if (!response.ok) {
@@ -206,8 +207,8 @@ async function loadCommunications() {
   communicationError.value = ''
 
   try {
-    const response = await fetch(
-      `http://localhost:5128/api/customers/${customerId.value}/communications`,
+    const response = await apiFetch(
+      `/api/customers/${customerId.value}/communications`,
     )
 
     if (!response.ok) {
@@ -254,8 +255,8 @@ async function saveDraft() {
   communicationError.value = ''
 
   try {
-    const response = await fetch(
-      'http://localhost:5128/api/communications',
+    const response = await apiFetch(
+      '/api/communications',
       {
         method: 'POST',
         headers: {

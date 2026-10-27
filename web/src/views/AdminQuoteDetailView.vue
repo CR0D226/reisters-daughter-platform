@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { apiFetch } from '@/services/api'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
@@ -83,8 +84,8 @@ async function loadQuote() {
   errorMessage.value = ''
 
   try {
-    const response = await fetch(
-      `http://localhost:5128/api/quotes/${route.params.id}`,
+    const response = await apiFetch(
+      `/api/quotes/${route.params.id}`,
     )
 
     if (response.status === 404) {
@@ -199,8 +200,8 @@ async function saveQuote() {
   saving.value = true
 
   try {
-    const response = await fetch(
-      `http://localhost:5128/api/quotes/${quote.value.id}`,
+    const response = await apiFetch(
+      `/api/quotes/${quote.value.id}`,
       {
         method: 'PUT',
 
@@ -275,8 +276,8 @@ async function sendQuote() {
   sending.value = true
 
   try {
-    const response = await fetch(
-      `http://localhost:5128/api/quotes/${quote.value.id}/send`,
+    const response = await apiFetch(
+      `/api/quotes/${quote.value.id}/send`,
       {
         method: 'POST',
       },

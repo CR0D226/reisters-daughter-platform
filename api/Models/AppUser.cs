@@ -14,7 +14,10 @@ public class AppUser
 
     public bool IsActive { get; set; } = true;
 
-    // Will hold the Entra External ID user identifier later.
+    public ICollection<EmployeePosition> Positions { get; set; } =
+    new List<EmployeePosition>();
+
+// Stable subject identifier from our configured identity provider.
     public string? ExternalId { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; } =

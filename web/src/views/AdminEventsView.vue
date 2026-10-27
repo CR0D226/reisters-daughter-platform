@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { apiFetch } from '@/services/api'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -329,11 +330,11 @@ async function loadEvents() {
   try {
     const [bookingsResponse, eventsResponse] =
       await Promise.all([
-        fetch(
-          'http://localhost:5128/api/bookings',
+        apiFetch(
+          '/api/bookings',
         ),
-        fetch(
-          'http://localhost:5128/api/events',
+        apiFetch(
+          '/api/events',
         ),
       ])
 
